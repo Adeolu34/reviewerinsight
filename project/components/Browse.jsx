@@ -1,6 +1,7 @@
 // Browse page — filterable grid with staggered animations
-const Browse = ({ setRoute, accent, density }) => {
+const Browse = ({ setRoute, route, accent, density }) => {
   const BOOKS = window.BOOKS;
+  const searchQuery = route?.search || '';
   const [genre, setGenre] = React.useState('All');
   const [sort, setSort] = React.useState('Newest');
   const [view, setView] = React.useState('grid');
@@ -17,22 +18,32 @@ const Browse = ({ setRoute, accent, density }) => {
     { genres: window.GENRES }
   );
 
-  // Fetch books from API with server-side filtering/sorting
+  // Fetch search results when a search query is active
+  const { resolved: searchData, loading: searchLoading } = useApi(
+    () => searchQuery ? ApiClient.search(searchQuery, { limit: 100 }) : Promise.resolve(null),
+    null,
+    [searchQuery]
+  );
+
+  // Fetch books from API with server-side filtering/sorting (when not searching)
   const { resolved: booksData } = useApi(
-    () => ApiClient.getBooks({
+    () => searchQuery ? Promise.resolve(null) : ApiClient.getBooks({
       ...(genre !== 'All' ? { genre } : {}),
       sort: sortMap[sort],
       limit: 100,
     }),
     null,
-    [genre, sort]
+    [genre, sort, searchQuery]
   );
 
   const genres = genreData.genres || window.GENRES;
 
-  // Use API data or fall back to static with client-side filtering
+  // Use search data when searching, otherwise normal browse data
   let list, totalBooks;
-  if (booksData) {
+  if (searchQuery && searchData) {
+    list = searchData.books;
+    totalBooks = searchData.total;
+  } else if (!searchQuery && booksData) {
     list = booksData.books;
     totalBooks = booksData.total;
   } else {
@@ -45,6 +56,7 @@ const Browse = ({ setRoute, accent, density }) => {
 
   const handleGenre = (g) => { setGenre(g); setAnimKey(k => k+1); };
   const handleSort = (s) => { setSort(s); setAnimKey(k => k+1); };
+  const clearSearch = () => setRoute({ name: 'browse' });
 
   return (
     <div className="ri-page-enter" style={{ background:'#F5EFE4', padding:`48px ${pad}px 96px` }}>
@@ -53,44 +65,75 @@ const Browse = ({ setRoute, accent, density }) => {
           opacity: heroVis ? 1 : 0, transform: heroVis ? 'translateY(0)' : 'translateY(32px)',
           transition: 'all .7s cubic-bezier(.2,.8,.2,1)'
         }}>
-          <Eyebrow color={accent}>The full catalog</Eyebrow>
+          <Eyebrow color={accent}>{searchQuery ? 'Search results' : 'The full catalog'}</Eyebrow>
           <h1 style={{ font:'900 96px "DM Serif Display", Georgia, serif', margin:'6px 0 0', letterSpacing:'-.025em', lineHeight:.9 }}>
-            Browse every <em style={{ color: accent, fontStyle:'italic' }}>review.</em>
+            {searchQuery
+              ? <span>Results for <em style={{ color: accent, fontStyle:'italic' }}>"{searchQuery}"</em></span>
+              : <span>Browse every <em style={{ color: accent, fontStyle:'italic' }}>review.</em></span>
+            }
           </h1>
+          {searchQuery && (
+            <button onClick={clearSearch} style={{
+              marginTop: 16, font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
+              padding:'8px 16px', border:'1.5px solid #141210', background:'transparent', color:'#141210', cursor:'pointer', borderRadius: 999,
+              transition:'all .2s ease'
+            }} className="ri-btn-ghost">Clear search</button>
+          )}
         </div>
         <div style={{
           font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', opacity: heroVis ? .75 : 0, textAlign:'right',
           transition: 'opacity .6s .2s ease'
         }}>
-          Showing {list.length} of {totalBooks} · Updated Tuesday
+          {searchLoading ? 'Searching…' : `Showing ${list.length}${totalBooks ? ` of ${totalBooks}` : ''}`} {!searchQuery && '· Updated Tuesday'}
         </div>
       </div>
 
-      <div style={{ borderTop:'1.5px solid #141210', borderBottom:'1.5px solid #141210', padding:'16px 0', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap: 16, marginBottom: 36 }}>
-        <div style={{ display:'flex', gap: 8, flexWrap:'wrap' }}>
-          {genres.map(g => <GenreTag key={g} onClick={()=>handleGenre(g)} active={genre===g} accent={accent}>{g}</GenreTag>)}
+      {!searchQuery && (
+        <div style={{ borderTop:'1.5px solid #141210', borderBottom:'1.5px solid #141210', padding:'16px 0', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap: 16, marginBottom: 36 }}>
+          <div style={{ display:'flex', gap: 8, flexWrap:'wrap' }}>
+            {genres.map(g => <GenreTag key={g} onClick={()=>handleGenre(g)} active={genre===g} accent={accent}>{g}</GenreTag>)}
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap: 16 }}>
+            <span style={{ font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', opacity:.7 }}>Sort:</span>
+            {['Newest','Highest rated','A — Z'].map(s=>(
+              <button key={s} onClick={()=>handleSort(s)} style={{
+                font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
+                padding:'6px 10px', border:0, background:'transparent', color:'#141210', cursor:'pointer',
+                textDecoration: sort===s ? 'underline' : 'none', textUnderlineOffset: 6, textDecorationThickness: 2,
+                textDecorationColor: accent, transition:'all .2s ease',
+                opacity: sort===s ? 1 : .6
+              }}>{s}</button>
+            ))}
+            <span style={{ width: 1, height: 20, background:'#141210', opacity:.3 }}/>
+            {['grid','list'].map(v=>(
+              <button key={v} onClick={()=>setView(v)} style={{
+                font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
+                padding:'6px 10px', border:'1.5px solid #141210', background: view===v ? '#141210' : 'transparent', color: view===v ? '#F5EFE4' : '#141210', cursor:'pointer',
+                transition:'all .2s ease', borderRadius: 3
+              }}>{v}</button>
+            ))}
+          </div>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap: 16 }}>
-          <span style={{ font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', opacity:.7 }}>Sort:</span>
-          {['Newest','Highest rated','A — Z'].map(s=>(
-            <button key={s} onClick={()=>handleSort(s)} style={{
-              font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
-              padding:'6px 10px', border:0, background:'transparent', color:'#141210', cursor:'pointer',
-              textDecoration: sort===s ? 'underline' : 'none', textUnderlineOffset: 6, textDecorationThickness: 2,
-              textDecorationColor: accent, transition:'all .2s ease',
-              opacity: sort===s ? 1 : .6
-            }}>{s}</button>
-          ))}
-          <span style={{ width: 1, height: 20, background:'#141210', opacity:.3 }}/>
-          {['grid','list'].map(v=>(
-            <button key={v} onClick={()=>setView(v)} style={{
-              font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
-              padding:'6px 10px', border:'1.5px solid #141210', background: view===v ? '#141210' : 'transparent', color: view===v ? '#F5EFE4' : '#141210', cursor:'pointer',
-              transition:'all .2s ease', borderRadius: 3
-            }}>{v}</button>
-          ))}
+      )}
+
+      {searchQuery && (
+        <div style={{ borderTop:'1.5px solid #141210', padding:'16px 0', marginBottom: 36, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ display:'flex', alignItems:'center', gap: 16 }}>
+            {['grid','list'].map(v=>(
+              <button key={v} onClick={()=>setView(v)} style={{
+                font:'600 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
+                padding:'6px 10px', border:'1.5px solid #141210', background: view===v ? '#141210' : 'transparent', color: view===v ? '#F5EFE4' : '#141210', cursor:'pointer',
+                transition:'all .2s ease', borderRadius: 3
+              }}>{v}</button>
+            ))}
+          </div>
+          {list.length === 0 && !searchLoading && (
+            <span style={{ font:'400 14px "Space Grotesk", sans-serif', opacity:.7 }}>
+              No books found matching your search. Try different keywords.
+            </span>
+          )}
         </div>
-      </div>
+      )}
 
       {view==='grid' ? (
         <div key={animKey} style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 32, rowGap: 48 }}>

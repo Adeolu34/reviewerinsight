@@ -247,7 +247,7 @@
       window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: value } }, '*');
     };
 
-    const ctx = { accent: tweaks.accent, density: tweaks.density, setRoute };
+    const ctx = { accent: tweaks.accent, density: tweaks.density, setRoute, route };
     const routeKey = route.name + (route.id || '');
     const Page = route.name === 'browse' ? window.Browse
                : route.name === 'recommend' ? window.Recommend

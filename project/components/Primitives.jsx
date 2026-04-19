@@ -68,11 +68,29 @@ const Seal = ({ children, color = "#E8432C", rotate = -8, size = 96 }) => (
 // Enhanced Header with glassmorphism
 const Header = ({ route, setRoute, accent, dark }) => {
   const [scrolled, setScrolled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef(null);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Sync search input with route (clear when navigating away from search)
+  useEffect(() => {
+    if (route.name !== 'browse' || !route.search) {
+      setSearchQuery('');
+    }
+  }, [route.name]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (q.length >= 2) {
+      setRoute({ name: 'browse', search: q });
+    }
+  };
 
   const ink = dark ? '#F5EFE4' : '#141210';
   const paper = dark ? '#141210' : '#F5EFE4';
@@ -131,10 +149,19 @@ const Header = ({ route, setRoute, accent, dark }) => {
           })}
         </nav>
         <div style={{ display:'flex', alignItems:'center', gap: 10 }}>
-          <div style={{ display:'flex', alignItems:'center', gap: 8, border:`1.5px solid ${ink}`, padding:'8px 12px', borderRadius: 999, minWidth: 220, transition:'box-shadow .3s ease', ':focus-within': { boxShadow: `0 0 0 3px ${accent}33` } }}>
-            <span style={{ font:'600 12px "JetBrains Mono", monospace', color: ink, opacity:.6 }}>⌕</span>
-            <input placeholder="Search 1,248 reviews…" style={{ border:0, background:'transparent', outline:'none', font:'400 13px "Space Grotesk", sans-serif', color: ink, width:'100%' }}/>
-          </div>
+          <form onSubmit={handleSearch} style={{ display:'flex', alignItems:'center', gap: 8, border:`1.5px solid ${ink}`, padding:'8px 12px', borderRadius: 999, minWidth: 220, transition:'box-shadow .3s ease' }}>
+            <span style={{ font:'600 12px "JetBrains Mono", monospace', color: ink, opacity:.6, cursor:'pointer' }} onClick={handleSearch}>⌕</span>
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search reviews…"
+              style={{ border:0, background:'transparent', outline:'none', font:'400 13px "Space Grotesk", sans-serif', color: ink, width:'100%' }}
+            />
+            {searchQuery && (
+              <span onClick={() => { setSearchQuery(''); searchRef.current?.focus(); }} style={{ cursor:'pointer', font:'600 14px "JetBrains Mono", monospace', color: ink, opacity:.5, lineHeight:1 }}>×</span>
+            )}
+          </form>
           <button className="ri-btn-primary" style={{
             font:'700 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
             padding:'10px 16px', background: accent, color:'#F5EFE4', border:0, cursor:'pointer', borderRadius: 999,
