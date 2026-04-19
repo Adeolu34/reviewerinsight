@@ -5,24 +5,34 @@ const AgentRun = require('../models/AgentRun');
 const Book = require('../models/Book');
 const AdminUser = require('../models/AdminUser');
 const config = require('../config/env');
+const logger = require('../utils/logger');
 const router = express.Router();
 
-// ─── Auto-seed admin account on first load ──────────────────────
-(async () => {
+/** Run once after MongoDB is connected. Creates first admin from env when collection is empty. */
+async function seedInitialAdmin() {
   try {
     const count = await AdminUser.countDocuments();
-    if (count === 0) {
-      await AdminUser.create({
-        email: 'johnadeolu401@gmail.com',
-        password: 'Ade@2018',
-        name: 'John Adeolu',
-      });
-      console.log('[Admin] Seeded initial admin account: johnadeolu401@gmail.com');
+    if (count > 0) return;
+
+    const email = (process.env.ADMIN_INITIAL_EMAIL || '').trim().toLowerCase();
+    const password = process.env.ADMIN_INITIAL_PASSWORD;
+    if (!email || !password) {
+      logger.warn(
+        '[Admin] No admin users in DB. Set ADMIN_INITIAL_EMAIL and ADMIN_INITIAL_PASSWORD (e.g. in Coolify env) to create the first account on startup.'
+      );
+      return;
     }
+
+    await AdminUser.create({
+      email,
+      password,
+      name: (process.env.ADMIN_INITIAL_NAME || 'Admin').trim() || 'Admin',
+    });
+    logger.info(`[Admin] Seeded initial admin account: ${email}`);
   } catch (err) {
-    console.error('[Admin] Failed to seed admin account:', err.message);
+    logger.error('[Admin] Failed to seed admin account:', err.message);
   }
-})();
+}
 
 // ─── POST /api/admin/login (public — no auth required) ─────────
 router.post('/login', async (req, res) => {
@@ -577,4 +587,5 @@ router.get('/system', async (req, res, next) => {
   }
 });
 
+router.seedInitialAdmin = seedInitialAdmin;
 module.exports = router;

@@ -859,9 +859,9 @@ const AdminLogin = ({ onAuth }) => {
         </div>
         <form onSubmit={submit}>
           <Label>Email</Label>
-          <Input type="email" value={email} onChange={setEmail} placeholder="admin@example.com" style={{ marginBottom: 14 }} />
+          <Input type="email" value={email} onChange={setEmail} autoComplete="username" placeholder="admin@example.com" style={{ marginBottom: 14 }} />
           <Label>Password</Label>
-          <Input type="password" value={password} onChange={setPassword} placeholder="Enter your password" style={{ marginBottom: 14 }} />
+          <Input type="password" value={password} onChange={setPassword} autoComplete="current-password" placeholder="Enter your password" style={{ marginBottom: 14 }} />
           {error && <div style={{ color: T.err, fontSize: 12, fontFamily: T.mono, marginBottom: 12, padding: '8px 10px', background: `${T.err}15`, borderRadius: 6 }}>{error}</div>}
           <Btn onClick={submit} disabled={loading || !email.trim() || !password} style={{ width: '100%' }}>{loading ? 'Signing in...' : 'Sign In'}</Btn>
         </form>

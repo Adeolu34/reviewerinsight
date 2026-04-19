@@ -20,6 +20,10 @@ async function startServer() {
   // Connect to MongoDB
   await connectDB(config.mongoUri);
 
+  if (typeof adminRouter.seedInitialAdmin === 'function') {
+    await adminRouter.seedInitialAdmin();
+  }
+
   const app = express();
 
   // Middleware
