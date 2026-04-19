@@ -122,4 +122,71 @@ async function checkApiAvailable() {
   return _apiAvailable;
 }
 
-Object.assign(window, { ApiClient, useApi, checkApiAvailable, normalizeBook });
+// ─── Admin API Client ───────────────────────────────────────────
+const AdminClient = {
+  _key: null,
+
+  getKey() {
+    if (this._key) return this._key;
+    this._key = sessionStorage.getItem('ri-admin-key');
+    return this._key;
+  },
+
+  setKey(key) {
+    this._key = key;
+    sessionStorage.setItem('ri-admin-key', key);
+  },
+
+  clearKey() {
+    this._key = null;
+    sessionStorage.removeItem('ri-admin-key');
+  },
+
+  async _fetch(endpoint, options = {}) {
+    const key = this.getKey();
+    if (!key) throw new Error('No admin key configured');
+
+    const res = await fetch(`${API_BASE}/admin${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': key,
+        ...(options.headers || {}),
+      },
+    });
+
+    if (res.status === 401) {
+      this.clearKey();
+      throw new Error('AUTH_EXPIRED');
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(err.error || `API ${res.status}`);
+    }
+    return res.json();
+  },
+
+  getOverview()            { return this._fetch('/overview'); },
+  getRuns(params = {})     { return this._fetch(`/runs?${new URLSearchParams(params)}`); },
+  getRun(id)               { return this._fetch(`/runs/${id}`); },
+  getAdminBooks(params={}) { return this._fetch(`/books?${new URLSearchParams(params)}`); },
+  getAnalytics(period='7d'){ return this._fetch(`/analytics?period=${period}`); },
+  getEditorStats()         { return this._fetch('/editors/stats'); },
+  getSystemInfo()          { return this._fetch('/system'); },
+  getCosts(since)          { return this._fetch(`/costs${since ? '?since=' + since : ''}`); },
+
+  updateBook(id, data) {
+    return this._fetch(`/books/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  deleteBook(id, hard = false) {
+    return this._fetch(`/books/${id}?hard=${hard}`, { method: 'DELETE' });
+  },
+  triggerAgent(editor, batchSize = 10) {
+    return this._fetch('/trigger-agent', { method: 'POST', body: JSON.stringify({ editor, batchSize }) });
+  },
+  retryBook(id, step = 'review') {
+    return this._fetch(`/books/${id}/retry`, { method: 'POST', body: JSON.stringify({ step }) });
+  },
+};
+
+Object.assign(window, { ApiClient, AdminClient, useApi, checkApiAvailable, normalizeBook });
