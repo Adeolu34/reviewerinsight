@@ -210,6 +210,7 @@
 <script type="text/babel" src="components/Review.jsx"></script>
 <script type="text/babel" src="components/Recommend.jsx"></script>
 <script type="text/babel" src="components/OtherPages.jsx"></script>
+<script type="text/babel" src="components/Admin.jsx"></script>
 
 <script type="text/babel">
   const { useState, useEffect } = React;
@@ -217,6 +218,8 @@
   function App() {
     const [route, setRoute] = useState(() => {
       try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('admin') === '1') return { name: 'admin' };
         const saved = JSON.parse(localStorage.getItem('ri-route') || 'null');
         return saved || { name: 'home' };
       } catch { return { name: 'home' }; }
@@ -225,7 +228,7 @@
     const [tweaksOpen, setTweaksOpen] = useState(false);
 
     useEffect(() => {
-      localStorage.setItem('ri-route', JSON.stringify(route));
+      if (route.name !== 'admin') localStorage.setItem('ri-route', JSON.stringify(route));
       window.scrollTo(0, 0);
     }, [route]);
 
@@ -249,6 +252,11 @@
 
     const ctx = { accent: tweaks.accent, density: tweaks.density, setRoute, route };
     const routeKey = route.name + (route.id || '');
+    // Admin gets its own full-screen layout (no Header)
+    if (route.name === 'admin') {
+      return <window.Admin setRoute={setRoute} accent={tweaks.accent} />;
+    }
+
     const Page = route.name === 'browse' ? window.Browse
                : route.name === 'recommend' ? window.Recommend
                : route.name === 'editors' ? window.Editors
