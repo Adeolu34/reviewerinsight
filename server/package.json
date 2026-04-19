@@ -1,0 +1,21 @@
+{
+  "name": "reviewer-insight-server",
+  "version": "1.0.0",
+  "description": "AI-powered book review agent system for Reviewer Insight",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node scripts/seed.js",
+    "agent": "node scripts/runAgent.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5",
+    "node-cron": "^3.0.3",
+    "openai": "^4.77.0",
+    "winston": "^3.17.0"
+  }
+}

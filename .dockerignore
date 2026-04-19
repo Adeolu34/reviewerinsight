@@ -1,0 +1,11 @@
+node_modules/
+server/node_modules/
+server/.env
+*.log
+.git
+.github
+.claude
+.DS_Store
+*.md
+docker-compose.yml
+nul

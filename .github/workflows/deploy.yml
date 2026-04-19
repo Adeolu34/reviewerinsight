@@ -1,0 +1,23 @@
+name: Deploy to Coolify
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Trigger Coolify Deploy
+        run: |
+          curl -s -X GET "${{ secrets.COOLIFY_WEBHOOK_URL }}"

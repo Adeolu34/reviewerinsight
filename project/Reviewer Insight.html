@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1440"/>
+<title>Reviewer Insight — Reviews, Summaries, A Good Read</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin: 0; padding: 0; background: #F5EFE4; color: #141210; font-family: "Space Grotesk", sans-serif; scroll-behavior: smooth; }
+  *, *::before, *::after { box-sizing: border-box; }
+  button { font-family: inherit; }
+  ::selection { background: rgba(232,67,44,.25); color: #141210; }
+
+  /* ─── Scroll-triggered reveal animations ─── */
+  @keyframes ri-fadeUp {
+    from { opacity: 0; transform: translateY(32px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes ri-fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes ri-scaleIn {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes ri-slideLeft {
+    from { opacity: 0; transform: translateX(48px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes ri-slideRight {
+    from { opacity: 0; transform: translateX(-48px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes ri-float {
+    0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
+    50%      { transform: translateY(-12px) rotate(var(--rot, 0deg)); }
+  }
+  @keyframes ri-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes ri-pulse {
+    0%, 100% { transform: rotate(var(--rot, -8deg)) scale(1); }
+    50%      { transform: rotate(var(--rot, -8deg)) scale(1.05); }
+  }
+  @keyframes ri-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(232,67,44,0.0); }
+    50%      { box-shadow: 0 0 40px rgba(232,67,44,0.15); }
+  }
+  @keyframes ri-gradient-shift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes ri-number-pop {
+    from { opacity: 0; transform: scale(0.6) translateY(20px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes ri-hero-text {
+    from { opacity: 0; transform: translateY(40px); clip-path: inset(100% 0 0 0); }
+    to   { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
+  }
+  @keyframes ri-underline-grow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+
+  .ri-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
+  .ri-reveal.visible { opacity: 1; transform: translateY(0); }
+  .ri-reveal-delay-1 { transition-delay: .1s; }
+  .ri-reveal-delay-2 { transition-delay: .2s; }
+  .ri-reveal-delay-3 { transition-delay: .3s; }
+  .ri-reveal-delay-4 { transition-delay: .4s; }
+  .ri-reveal-delay-5 { transition-delay: .5s; }
+
+  /* ─── Enhanced hover effects ─── */
+  .ri-card { transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+  .ri-card:hover { transform: translateY(-6px); }
+  .ri-card:hover .ri-cover {
+    transform: translateY(-4px) rotate(0deg) scale(1.02);
+    box-shadow: 0 4px 8px rgba(20,18,16,0.15), 0 24px 48px -16px rgba(20,18,16,0.35);
+  }
+  .ri-row { transition: all .25s ease; }
+  .ri-row:hover { background: rgba(20,18,16,.05); padding-left: 12px; }
+  .ri-tag { transition: all .25s cubic-bezier(.2,.8,.2,1) !important; }
+  .ri-tag:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 4px 12px rgba(20,18,16,0.1); }
+
+  /* ─── 3D book cover effects ─── */
+  .ri-cover {
+    transition: transform .45s cubic-bezier(.2,.8,.2,1), box-shadow .45s ease;
+    will-change: transform;
+  }
+  .ri-cover::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 100%);
+    opacity: 0; transition: opacity .4s ease; pointer-events: none;
+  }
+  .ri-cover:hover::after { opacity: 1; }
+
+  /* ─── Button hover glow ─── */
+  .ri-btn-primary {
+    position: relative; overflow: hidden;
+    transition: transform .2s ease, box-shadow .3s ease;
+  }
+  .ri-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px -8px rgba(20,18,16,0.3);
+  }
+  .ri-btn-primary:active { transform: translateY(0) scale(0.98); }
+  .ri-btn-primary::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    transform: translateX(-100%); transition: transform .5s ease;
+  }
+  .ri-btn-primary:hover::before { transform: translateX(100%); }
+
+  .ri-btn-ghost {
+    transition: all .25s ease;
+  }
+  .ri-btn-ghost:hover {
+    background: #141210 !important; color: #F5EFE4 !important;
+    transform: translateY(-1px);
+  }
+
+  /* ─── Magazine grain — refined ─── */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+    background-image: radial-gradient(rgba(20,18,16,0.05) 1px, transparent 1.2px);
+    background-size: 3px 3px; mix-blend-mode: multiply; opacity: .35;
+  }
+
+  /* ─── Marquee ─── */
+  @keyframes ri-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-33.333%); }
+  }
+  .ri-marquee { animation: ri-scroll 60s linear infinite; }
+  .ri-marquee:hover { animation-play-state: paused; }
+
+  /* ─── Decorative section separator ─── */
+  .ri-section-glow {
+    position: relative;
+  }
+  .ri-section-glow::before {
+    content: ""; position: absolute; top: -1px; left: 10%; right: 10%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent, #E8432C), transparent);
+    opacity: 0.4;
+  }
+
+  /* ─── Link underline animation ─── */
+  .ri-link { position: relative; text-decoration: none; }
+  .ri-link::after {
+    content: ""; position: absolute; left: 0; bottom: -2px; width: 100%; height: 1.5px;
+    background: currentColor; transform: scaleX(0); transform-origin: right;
+    transition: transform .3s cubic-bezier(.2,.8,.2,1);
+  }
+  .ri-link:hover::after { transform: scaleX(1); transform-origin: left; }
+
+  /* ─── Smooth page transitions ─── */
+  .ri-page-enter { animation: ri-fadeUp .5s cubic-bezier(.2,.8,.2,1) both; }
+
+  /* ─── Tweaks panel ─── */
+  .tweaks-panel {
+    position: fixed; right: 20px; bottom: 20px; width: 320px;
+    background: #141210; color: #F5EFE4; padding: 22px; z-index: 1001;
+    border: 1.5px solid #F5EFE4; box-shadow: 0 20px 60px -20px rgba(0,0,0,.5);
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    display: none; backdrop-filter: blur(20px);
+  }
+  .tweaks-panel.visible { display: block; animation: ri-scaleIn .3s ease both; }
+  .tweaks-panel h4 { margin: 0 0 14px; font: 900 20px "DM Serif Display", Georgia, serif; letter-spacing: -.02em; }
+  .tweaks-panel label { display: block; text-transform: uppercase; letter-spacing: .14em; opacity: .7; font-size: 10px; margin: 14px 0 6px; }
+  .tweaks-panel .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tweaks-panel .sw { aspect-ratio: 1; cursor: pointer; border: 1.5px solid #F5EFE4; transition: transform .2s ease, box-shadow .2s ease; }
+  .tweaks-panel .sw:hover { transform: scale(1.15); box-shadow: 0 0 12px rgba(245,239,228,0.3); }
+  .tweaks-panel .sw.on { outline: 2px solid #F5EFE4; outline-offset: 2px; }
+  .tweaks-panel .seg { display: flex; border: 1.5px solid #F5EFE4; }
+  .tweaks-panel .seg button { flex: 1; padding: 8px; border: 0; background: transparent; color: #F5EFE4;
+    font: 700 10px "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: .14em; cursor: pointer; transition: all .2s ease; }
+  .tweaks-panel .seg button:hover { background: rgba(245,239,228,0.1); }
+  .tweaks-panel .seg button.on { background: #F5EFE4; color: #141210; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data/books.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // Tweakable defaults — persisted via the host's edit-mode protocol.
+  window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accent": "#E8432C",
+    "density": "cozy",
+    "heroVariant": "collage"
+  }/*EDITMODE-END*/;
+</script>
+
+<script type="text/babel" src="components/ApiClient.jsx"></script>
+<script type="text/babel" src="components/Primitives.jsx"></script>
+<script type="text/babel" src="components/Cover.jsx"></script>
+<script type="text/babel" src="components/Home.jsx"></script>
+<script type="text/babel" src="components/Browse.jsx"></script>
+<script type="text/babel" src="components/Review.jsx"></script>
+<script type="text/babel" src="components/Recommend.jsx"></script>
+<script type="text/babel" src="components/OtherPages.jsx"></script>
+
+<script type="text/babel">
+  const { useState, useEffect } = React;
+
+  function App() {
+    const [route, setRoute] = useState(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('ri-route') || 'null');
+        return saved || { name: 'home' };
+      } catch { return { name: 'home' }; }
+    });
+    const [tweaks, setTweaks] = useState(window.TWEAK_DEFAULTS);
+    const [tweaksOpen, setTweaksOpen] = useState(false);
+
+    useEffect(() => {
+      localStorage.setItem('ri-route', JSON.stringify(route));
+      window.scrollTo(0, 0);
+    }, [route]);
+
+    // Tweaks protocol
+    useEffect(() => {
+      const onMsg = (e) => {
+        if (!e.data || typeof e.data !== 'object') return;
+        if (e.data.type === '__activate_edit_mode') setTweaksOpen(true);
+        if (e.data.type === '__deactivate_edit_mode') setTweaksOpen(false);
+      };
+      window.addEventListener('message', onMsg);
+      window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+      return () => window.removeEventListener('message', onMsg);
+    }, []);
+
+    const updateTweak = (key, value) => {
+      const next = { ...tweaks, [key]: value };
+      setTweaks(next);
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: value } }, '*');
+    };
+
+    const ctx = { accent: tweaks.accent, density: tweaks.density, setRoute };
+    const routeKey = route.name + (route.id || '');
+    const Page = route.name === 'browse' ? window.Browse
+               : route.name === 'recommend' ? window.Recommend
+               : route.name === 'editors' ? window.Editors
+               : route.name === 'membership' ? window.Membership
+               : route.name === 'review' ? () => <window.Review bookId={route.id} initialTab={route.tab} {...ctx}/>
+               : window.Home;
+
+    return (
+      <div data-screen-label={`Route: ${route.name}`} style={{ '--accent': tweaks.accent }}>
+        <window.Header route={route} setRoute={setRoute} accent={tweaks.accent}/>
+        <div key={routeKey}><Page {...ctx}/></div>
+        <div className={"tweaks-panel" + (tweaksOpen ? " visible" : "")}>
+          <h4>Tweaks</h4>
+          <label>Accent color</label>
+          <div className="swatches">
+            {['#E8432C','#1E3A8A','#E4A72B','#0F5132','#141210'].map(c => (
+              <div key={c} className={"sw" + (tweaks.accent===c?' on':'')} style={{ background: c }} onClick={()=>updateTweak('accent', c)}/>
+            ))}
+          </div>
+          <label>Density</label>
+          <div className="seg">
+            {['cozy','compact'].map(d => (
+              <button key={d} className={tweaks.density===d?'on':''} onClick={()=>updateTweak('density', d)}>{d}</button>
+            ))}
+          </div>
+          <label>Jump to</label>
+          <div className="seg">
+            {[['home','Home'],['browse','Browse'],['recommend','For You'],['review','Review'],['membership','Member']].map(([k,lab]) => (
+              <button key={k} onClick={()=>setRoute(k==='review'?{name:'review',id:1}:{name:k})}>{lab}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
