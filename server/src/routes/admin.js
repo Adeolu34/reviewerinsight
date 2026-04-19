@@ -1,17 +1,78 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const AgentRun = require('../models/AgentRun');
 const Book = require('../models/Book');
+const AdminUser = require('../models/AdminUser');
 const config = require('../config/env');
 const router = express.Router();
 
-// Simple API key auth middleware
-function requireAdmin(req, res, next) {
-  const key = req.headers['x-admin-key'];
-  if (!key || key !== process.env.ADMIN_API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
+// ─── Auto-seed admin account on first load ──────────────────────
+(async () => {
+  try {
+    const count = await AdminUser.countDocuments();
+    if (count === 0) {
+      await AdminUser.create({
+        email: 'johnadeolu401@gmail.com',
+        password: 'Ade@2018',
+        name: 'John Adeolu',
+      });
+      console.log('[Admin] Seeded initial admin account: johnadeolu401@gmail.com');
+    }
+  } catch (err) {
+    console.error('[Admin] Failed to seed admin account:', err.message);
   }
-  next();
+})();
+
+// ─── POST /api/admin/login (public — no auth required) ─────────
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = await AdminUser.findOne({ email: email.toLowerCase().trim() });
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      config.jwtSecret,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ token, user: { email: user.email, name: user.name } });
+  } catch (err) {
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// ─── JWT auth middleware (falls back to API key for compat) ─────
+async function requireAdmin(req, res, next) {
+  // Try JWT token first
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.slice(7), config.jwtSecret);
+      const user = await AdminUser.findById(decoded.userId);
+      if (user) {
+        req.admin = user;
+        return next();
+      }
+    } catch (err) {
+      // Token invalid/expired — fall through
+    }
+  }
+
+  // Fallback: legacy API key
+  const key = req.headers['x-admin-key'];
+  if (key && key === process.env.ADMIN_API_KEY) {
+    return next();
+  }
+
+  return res.status(401).json({ error: 'Unauthorized' });
 }
 
 router.use(requireAdmin);

@@ -124,39 +124,54 @@ async function checkApiAvailable() {
 
 // ─── Admin API Client ───────────────────────────────────────────
 const AdminClient = {
-  _key: null,
+  _token: null,
 
-  getKey() {
-    if (this._key) return this._key;
-    this._key = sessionStorage.getItem('ri-admin-key');
-    return this._key;
+  getToken() {
+    if (this._token) return this._token;
+    this._token = sessionStorage.getItem('ri-admin-token');
+    return this._token;
   },
 
-  setKey(key) {
-    this._key = key;
-    sessionStorage.setItem('ri-admin-key', key);
+  setToken(token) {
+    this._token = token;
+    sessionStorage.setItem('ri-admin-token', token);
   },
 
-  clearKey() {
-    this._key = null;
-    sessionStorage.removeItem('ri-admin-key');
+  clearToken() {
+    this._token = null;
+    sessionStorage.removeItem('ri-admin-token');
+  },
+
+  async login(email, password) {
+    const res = await fetch(`${API_BASE}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Login failed' }));
+      throw new Error(err.error || `API ${res.status}`);
+    }
+    const data = await res.json();
+    this.setToken(data.token);
+    return data;
   },
 
   async _fetch(endpoint, options = {}) {
-    const key = this.getKey();
-    if (!key) throw new Error('No admin key configured');
+    const token = this.getToken();
+    if (!token) throw new Error('Not authenticated');
 
     const res = await fetch(`${API_BASE}/admin${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'X-Admin-Key': key,
+        'Authorization': `Bearer ${token}`,
         ...(options.headers || {}),
       },
     });
 
     if (res.status === 401) {
-      this.clearKey();
+      this.clearToken();
       throw new Error('AUTH_EXPIRED');
     }
     if (!res.ok) {

@@ -831,22 +831,21 @@ const SystemSection = () => {
 // LOGIN + MAIN SHELL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const AdminLogin = ({ onAuth }) => {
-  const [key, setKey] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [testing, setTesting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!key.trim()) return;
-    setTesting(true); setError('');
+    if (!email.trim() || !password) return;
+    setLoading(true); setError('');
     try {
-      AdminClient.setKey(key.trim());
-      await AdminClient.getOverview();
+      await AdminClient.login(email.trim(), password);
       onAuth();
     } catch (err) {
-      AdminClient.clearKey();
-      setError(err.message === 'AUTH_EXPIRED' ? 'Invalid admin key' : err.message);
-    } finally { setTesting(false); }
+      setError(err.message === 'AUTH_EXPIRED' ? 'Session expired, please login again' : err.message);
+    } finally { setLoading(false); }
   };
 
   return (
@@ -859,10 +858,12 @@ const AdminLogin = ({ onAuth }) => {
           <div style={{ fontSize: 11, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.16em', color: T.muted, marginTop: 6 }}>Admin Dashboard</div>
         </div>
         <form onSubmit={submit}>
-          <Label>Admin API Key</Label>
-          <Input type="password" value={key} onChange={setKey} placeholder="Enter your admin key" style={{ marginBottom: 14 }} />
+          <Label>Email</Label>
+          <Input type="email" value={email} onChange={setEmail} placeholder="admin@example.com" style={{ marginBottom: 14 }} />
+          <Label>Password</Label>
+          <Input type="password" value={password} onChange={setPassword} placeholder="Enter your password" style={{ marginBottom: 14 }} />
           {error && <div style={{ color: T.err, fontSize: 12, fontFamily: T.mono, marginBottom: 12, padding: '8px 10px', background: `${T.err}15`, borderRadius: 6 }}>{error}</div>}
-          <Btn onClick={submit} disabled={testing || !key.trim()} style={{ width: '100%' }}>{testing ? 'Verifying...' : 'Sign In'}</Btn>
+          <Btn onClick={submit} disabled={loading || !email.trim() || !password} style={{ width: '100%' }}>{loading ? 'Signing in...' : 'Sign In'}</Btn>
         </form>
       </div>
     </div>
@@ -879,7 +880,7 @@ const SECTIONS = [
 ];
 
 const Admin = ({ setRoute }) => {
-  const [authed, setAuthed] = useState(!!AdminClient.getKey());
+  const [authed, setAuthed] = useState(!!AdminClient.getToken());
   const [section, setSection] = useState('overview');
 
   // If auth expired mid-session
@@ -927,7 +928,7 @@ const Admin = ({ setRoute }) => {
         </nav>
 
         <div style={{ padding: '12px 20px', borderTop: `1px solid ${T.border}` }}>
-          <Btn small variant="ghost" onClick={() => { AdminClient.clearKey(); setAuthed(false); }} style={{ width: '100%' }}>Sign Out</Btn>
+          <Btn small variant="ghost" onClick={() => { AdminClient.clearToken(); setAuthed(false); }} style={{ width: '100%' }}>Sign Out</Btn>
         </div>
       </div>
 
