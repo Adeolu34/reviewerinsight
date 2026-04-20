@@ -235,6 +235,15 @@ const AdminClient = {
   triggerScraper(source) {
     return this._fetch('/scraper/run', { method: 'POST', body: JSON.stringify(source ? { source } : {}) });
   },
+
+  // Duplicates
+  getDuplicates()         { return this._fetch('/duplicates'); },
+  mergeDuplicates(keepId, removeIds) {
+    return this._fetch('/duplicates/merge', { method: 'POST', body: JSON.stringify({ keepId, removeIds }) });
+  },
+  dismissDuplicates(ids) {
+    return this._fetch('/duplicates/dismiss', { method: 'POST', body: JSON.stringify({ ids }) });
+  },
 };
 
 Object.assign(window, { ApiClient, AdminClient, useApi, checkApiAvailable, normalizeBook });

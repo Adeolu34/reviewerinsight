@@ -9,7 +9,7 @@ module.exports = function securityHeaders(req, res, next) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: http:",
-      "connect-src 'self' https://openlibrary.org",
+      "connect-src 'self' https://openlibrary.org https://www.googleapis.com https://books.google.com",
     ].join('; ')
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');

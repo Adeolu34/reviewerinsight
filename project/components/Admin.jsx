@@ -1247,11 +1247,152 @@ const ScraperRunsView = () => {
   );
 };
 
+// ━━━ DUPLICATES SECTION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const STATUS_PRIORITY = ['published', 'review_complete', 'review_pending', 'metadata_complete', 'discovered', 'failed'];
+
+const DuplicatesSection = () => {
+  const { data, loading, refresh } = useAdminApi(() => AdminClient.getDuplicates());
+  const [merging, setMerging] = useState(null);
+  const [message, setMessage] = useState(null);
+
+  const handleMerge = async (group) => {
+    // Auto-pick best book: highest status priority, then highest rating, then newest
+    const sorted = [...group.books].sort((a, b) => {
+      const sa = STATUS_PRIORITY.indexOf(a.status);
+      const sb = STATUS_PRIORITY.indexOf(b.status);
+      if (sa !== sb) return sa - sb;
+      if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    const keeper = sorted[0];
+    const removeIds = sorted.slice(1).map(b => b._id);
+
+    if (!confirm(`Keep "${keeper.title}" (${keeper.status}, rating: ${keeper.rating || 'N/A'}) and remove ${removeIds.length} duplicate(s)?`)) return;
+
+    setMerging(group.key);
+    try {
+      const result = await AdminClient.mergeDuplicates(keeper._id, removeIds);
+      setMessage({ type: 'ok', text: result.message });
+      refresh();
+    } catch (err) {
+      setMessage({ type: 'err', text: err.message });
+    }
+    setMerging(null);
+  };
+
+  const handleDismissScraped = async (dup) => {
+    // Keep one, dismiss the rest
+    const removeIds = dup.ids.slice(1);
+    setMerging(dup._id?.title);
+    try {
+      const result = await AdminClient.dismissDuplicates(removeIds);
+      setMessage({ type: 'ok', text: result.message });
+      refresh();
+    } catch (err) {
+      setMessage({ type: 'err', text: err.message });
+    }
+    setMerging(null);
+  };
+
+  if (loading) return <div style={{ padding: 32, opacity: .5 }}>Loading duplicates...</div>;
+
+  const bookDups = data?.bookDuplicates || [];
+  const scrapedDups = data?.scrapedDuplicates || [];
+
+  return (
+    <div>
+      {message && (
+        <div style={{ padding: '10px 16px', marginBottom: 16, borderRadius: 8, fontSize: 13, fontFamily: T.mono, background: message.type === 'ok' ? '#dcfce7' : '#fef2f2', color: message.type === 'ok' ? '#166534' : '#991b1b' }}>
+          {message.text}
+          <span onClick={() => setMessage(null)} style={{ cursor: 'pointer', marginLeft: 12, opacity: .5 }}>x</span>
+        </div>
+      )}
+
+      {/* Summary metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+        <Metric label="Book Duplicate Groups" value={bookDups.length} />
+        <Metric label="Extra Book Copies" value={data?.totalBookDups || 0} />
+        <Metric label="Scraped Dup Groups" value={scrapedDups.length} />
+        <Metric label="Extra Scraped Copies" value={data?.totalScrapedDups || 0} />
+      </div>
+
+      {/* Book duplicates */}
+      <Card title={`Book Collection Duplicates (${bookDups.length} groups)`} style={{ marginBottom: 24 }}>
+        {bookDups.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', opacity: .5, fontFamily: T.mono, fontSize: 12 }}>No duplicates found — collection is clean</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {bookDups.map(group => (
+              <div key={group.key} style={{ padding: 16, border: `1px solid ${T.border}`, borderRadius: 8, background: T.hover }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: 14, fontFamily: T.serif }}>{group.books[0]?.title}</span>
+                    <span style={{ marginLeft: 8, fontSize: 12, fontFamily: T.mono, opacity: .6 }}>{group.count} copies</span>
+                  </div>
+                  <Btn small onClick={() => handleMerge(group)} disabled={merging === group.key}>
+                    {merging === group.key ? 'Merging...' : 'Auto-Merge'}
+                  </Btn>
+                </div>
+                <table style={{ width: '100%', fontSize: 12, fontFamily: T.mono, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${T.border}`, textAlign: 'left' }}>
+                      <th style={{ padding: '4px 8px' }}>Title</th>
+                      <th style={{ padding: '4px 8px' }}>Author</th>
+                      <th style={{ padding: '4px 8px' }}>Status</th>
+                      <th style={{ padding: '4px 8px' }}>Rating</th>
+                      <th style={{ padding: '4px 8px' }}>Genre</th>
+                      <th style={{ padding: '4px 8px' }}>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.books.map((b, i) => (
+                      <tr key={b._id} style={{ borderBottom: `1px solid ${T.border}22`, background: i === 0 ? `${T.accent}08` : 'transparent' }}>
+                        <td style={{ padding: '6px 8px', fontWeight: i === 0 ? 700 : 400 }}>{b.title}</td>
+                        <td style={{ padding: '6px 8px' }}>{b.author}</td>
+                        <td style={{ padding: '6px 8px' }}><StatusBadge status={b.status} /></td>
+                        <td style={{ padding: '6px 8px' }}>{b.rating || '—'}</td>
+                        <td style={{ padding: '6px 8px' }}>{b.genre}</td>
+                        <td style={{ padding: '6px 8px' }}>{new Date(b.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Scraped duplicates */}
+      <Card title={`Scraped Book Duplicates (${scrapedDups.length} groups)`}>
+        {scrapedDups.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', opacity: .5, fontFamily: T.mono, fontSize: 12 }}>No scraped duplicates found</div>
+        ) : (
+          <Table
+            columns={[
+              { key: '_id', label: 'Title / Author', render: v => <span><strong>{v.title}</strong> — {v.author}</span> },
+              { key: 'count', label: 'Copies', mono: true },
+              { key: 'sources', label: 'Sources', render: v => v.join(', ') },
+            ]}
+            rows={scrapedDups}
+            actions={row => (
+              <Btn small variant="ghost" onClick={() => handleDismissScraped(row)} disabled={!!merging}>
+                Dismiss Extras
+              </Btn>
+            )}
+          />
+        )}
+      </Card>
+    </div>
+  );
+};
+
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: '◐' },
   { id: 'runs', label: 'Agent Runs', icon: '▶' },
   { id: 'books', label: 'Books', icon: '▤' },
   { id: 'scraper', label: 'Scraper', icon: '⇣' },
+  { id: 'duplicates', label: 'Duplicates', icon: '⊘' },
   { id: 'editors', label: 'Editors', icon: '✎' },
   { id: 'analytics', label: 'Analytics', icon: '◔' },
   { id: 'system', label: 'System', icon: '⚙' },
@@ -1274,6 +1415,7 @@ const Admin = ({ setRoute }) => {
     runs: RunsSection,
     books: BooksSection,
     scraper: ScraperSection,
+    duplicates: DuplicatesSection,
     editors: EditorsSection,
     analytics: AnalyticsSection,
     system: SystemSection,

@@ -218,6 +218,7 @@
   function App() {
     const [route, setRoute] = useState(() => {
       try {
+        if (window.location.pathname === '/reviewadmin') return { name: 'admin' };
         const params = new URLSearchParams(window.location.search);
         if (params.get('admin') === '1') return { name: 'admin' };
         const saved = JSON.parse(localStorage.getItem('ri-route') || 'null');
