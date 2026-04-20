@@ -16,6 +16,10 @@ const Home = ({ setRoute, accent, density }) => {
     () => ApiClient.getBooks({ limit: 12 }),
     { books: BOOKS.slice(0, 12), total: BOOKS.length }
   );
+  const { resolved: trendingData } = useApi(
+    () => ApiClient.getTrending(),
+    { trending: [] }
+  );
 
   const featured = featuredData.featured;
   const featuredSide = featuredData.also;
@@ -23,8 +27,11 @@ const Home = ({ setRoute, accent, density }) => {
   const totalBooks = latestData.total || stats.totalBooks;
 
   // Scroll reveal refs
+  const trending = trendingData.trending || [];
+
   const [calloutRef, calloutVis] = useReveal();
   const [featRef, featVis] = useReveal();
+  const [trendRef, trendVis] = useReveal();
   const [quoteRef, quoteVis] = useReveal();
   const [catRef, catVis] = useReveal();
   const [editRef, editVis] = useReveal();
@@ -162,6 +169,52 @@ const Home = ({ setRoute, accent, density }) => {
           ))}
         </div>
       </section>
+
+      {/* TRENDING NOW — popular books from external sources */}
+      {trending.length > 0 && (
+        <section ref={trendRef} style={{ padding: `56px ${pad}px`, borderBottom:'1.5px solid #141210', background:'#FDFAF5' }}>
+          <div style={{
+            display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom: 28,
+            opacity: trendVis ? 1 : 0, transform: trendVis ? 'translateY(0)' : 'translateY(24px)',
+            transition: 'all .6s cubic-bezier(.2,.8,.2,1)'
+          }}>
+            <div>
+              <Eyebrow color={accent}>Trending Now · From the wider world of books</Eyebrow>
+              <h2 style={{ font:'900 54px "DM Serif Display", Georgia, serif', margin:'6px 0 0', letterSpacing:'-.015em' }}>
+                What the world is reading.
+              </h2>
+            </div>
+            <button onClick={()=>setRoute({name:'recommend'})} className="ri-btn-ghost" style={{
+              font:'700 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
+              padding:'12px 18px', background:'transparent', color:'#141210', border:'1.5px solid #141210', cursor:'pointer', borderRadius: 999, alignSelf:'flex-end'
+            }}>Get Personalized Picks →</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 28, rowGap: 36 }}>
+            {trending.slice(0, 8).map((b, idx) => (
+              <a key={`${b.title}-${idx}`} href={b.buyLink || '#'} target={b.buyLink ? '_blank' : undefined} rel="noopener noreferrer" style={{
+                textDecoration:'none', color:'#141210', cursor:'pointer',
+                opacity: trendVis ? 1 : 0,
+                transform: trendVis ? 'translateY(0)' : 'translateY(28px)',
+                transition: `all .5s ${Math.min(idx * .06, .5)}s cubic-bezier(.2,.8,.2,1)`
+              }} className="ri-card">
+                {b.coverImageUrl ? (
+                  <img src={b.coverImageUrl} alt={b.title} style={{ width:'100%', height: 220, objectFit:'contain', borderRadius: 2, background:'#14121008' }} />
+                ) : (
+                  <div style={{ width:'100%', height: 220, background:'#141210', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <span style={{ font:'700 14px/1.15 "DM Serif Display", Georgia, serif', color:'#F5EFE4', textAlign:'center', padding: 16 }}>{b.title}</span>
+                  </div>
+                )}
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ font:'600 10px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', color: accent, marginBottom: 4 }}>{b.genre || 'Books'}{b.year ? ` · ${b.year}` : ''}</div>
+                  <div style={{ font:'700 16px/1.15 "DM Serif Display", Georgia, serif', textWrap:'balance' }}>{b.title}</div>
+                  <div style={{ font:'400 12px "Space Grotesk", sans-serif', opacity:.7, marginTop: 2 }}>{b.author}</div>
+                  {b.rating && <div style={{ marginTop: 8 }}><Stars value={b.rating} size={11}/></div>}
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* PULL QUOTE — dramatic dark band with reveal */}
       <section ref={quoteRef} style={{

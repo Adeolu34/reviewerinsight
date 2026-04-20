@@ -17,6 +17,7 @@ const statsRouter = require('./routes/stats');
 const adminRouter = require('./routes/admin');
 const scraperRouter = require('./routes/scraper');
 const recommendationsRouter = require('./routes/recommendations');
+const trendingRouter = require('./routes/trending');
 
 async function startServer() {
   // Connect to MongoDB
@@ -45,6 +46,7 @@ async function startServer() {
   app.use('/api/admin', adminRouter);
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
+  app.use('/api/books', trendingRouter);
 
   // Health check
   app.get('/api/health', (req, res) => {

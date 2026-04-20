@@ -301,8 +301,36 @@ const RecommendationCard = ({ rec, index, setRoute, accent }) => {
   );
 };
 
+const ExternalBookCard = ({ book, index, accent }) => (
+  <div style={{
+    padding: 20, border: '1.5px solid #14121020', borderRadius: 4, position: 'relative',
+    animation: `ri-fadeUp .5s ${index * 0.1}s cubic-bezier(.2,.8,.2,1) both`,
+  }} className="ri-card">
+    <div style={{ position: 'absolute', top: 10, right: 10, font: '600 8px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', padding: '3px 8px', background: '#14121010', borderRadius: 999, color: '#141210', opacity: .5 }}>External</div>
+    {book.coverImageUrl ? (
+      <img src={book.coverImageUrl} alt={book.title} style={{ width: '100%', height: 200, objectFit: 'contain', borderRadius: 2, marginBottom: 14, background: '#14121008' }} />
+    ) : (
+      <div style={{ width: '100%', height: 200, background: '#141210', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+        <span style={{ font: '700 14px/1.1 "DM Serif Display", Georgia, serif', color: '#F5EFE4', textAlign: 'center', padding: 16 }}>{book.title}</span>
+      </div>
+    )}
+    {book.genre && <Eyebrow color={accent} style={{ marginBottom: 6 }}>{book.genre}{book.year ? ` · ${book.year}` : ''}</Eyebrow>}
+    <h4 style={{ font: '700 18px/1.15 "DM Serif Display", Georgia, serif', margin: '0 0 4px' }}>{book.title}</h4>
+    <div style={{ font: '600 11px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', opacity: .65, marginBottom: 8 }}>{book.author}</div>
+    {book.rating && <div style={{ marginBottom: 10 }}><Stars value={book.rating} size={11} /></div>}
+    {book.description && <p style={{ font: '400 13px/1.45 "Space Grotesk", sans-serif', margin: '0 0 14px', opacity: .8, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{book.description}</p>}
+    {book.buyLink && (
+      <a href={book.buyLink} target="_blank" rel="noopener noreferrer" style={{
+        display: 'inline-block', font: '700 10px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em',
+        padding: '8px 14px', border: `1.5px solid ${accent}`, color: accent, borderRadius: 999, textDecoration: 'none',
+        transition: 'all .2s ease',
+      }} className="ri-btn-ghost">View Book →</a>
+    )}
+  </div>
+);
+
 const ResultsDisplay = ({ data, onRestart, setRoute, accent }) => {
-  const { prescription, recommendations, meta } = data;
+  const { prescription, recommendations, externalPicks, meta } = data;
   const [heroRef, heroVis] = useReveal();
   return (
     <div>
@@ -345,6 +373,22 @@ const ResultsDisplay = ({ data, onRestart, setRoute, accent }) => {
           <RecommendationCard key={rec.bookId || i} rec={rec} index={i} setRoute={setRoute} accent={accent} />
         ))}
       </div>
+
+      {/* External picks — Popular Right Now */}
+      {externalPicks && externalPicks.length > 0 && (
+        <div style={{ maxWidth: 800, margin: '48px auto 0' }}>
+          <Rule style={{ marginBottom: 28 }} />
+          <Eyebrow color={accent} style={{ marginBottom: 8 }}>Popular Right Now · From the wider world of books</Eyebrow>
+          <h3 style={{ font: '700 36px "DM Serif Display", Georgia, serif', margin: '0 0 24px', letterSpacing: '-.01em' }}>
+            You might also enjoy
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
+            {externalPicks.slice(0, 8).map((book, i) => (
+              <ExternalBookCard key={`${book.title}-${i}`} book={book} index={i} accent={accent} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 48 }}>

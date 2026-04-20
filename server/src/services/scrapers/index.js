@@ -1,16 +1,24 @@
 const ScraperRun = require('../../models/ScraperRun');
 const logger = require('../../utils/logger');
 
+const config = require('../../config/env');
+
 const NprBooksScraper = require('./nprBooks');
 const GuardianBooksScraper = require('./guardianBooks');
 const BookPageScraper = require('./bookPage');
 const OpenLibraryScraper = require('./openLibrary');
+const NytBestsellersScraper = require('./nytBestsellers');
+const GoogleBooksTrendingScraper = require('./googleBooksTrending');
+const AppleBooksTopScraper = require('./appleBooksTop');
 
 const SCRAPERS = {
   npr: new NprBooksScraper(),
   guardian: new GuardianBooksScraper(),
   bookpage: new BookPageScraper(),
   openlibrary: new OpenLibraryScraper(),
+  nyt: new NytBestsellersScraper(),
+  googlebooks: new GoogleBooksTrendingScraper(),
+  applebooks: new AppleBooksTopScraper(),
 };
 
 /**

@@ -873,8 +873,8 @@ const AdminLogin = ({ onAuth }) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SECTION: Scraper
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const SOURCE_COLORS = { npr: '#3B82F6', guardian: '#1E3A8A', bookpage: '#10B981', openlibrary: '#8B5CF6' };
-const SOURCE_LABELS = { npr: 'NPR Books', guardian: 'The Guardian', bookpage: 'BookPage', openlibrary: 'Open Library' };
+const SOURCE_COLORS = { npr: '#3B82F6', guardian: '#1E3A8A', bookpage: '#10B981', openlibrary: '#8B5CF6', nyt: '#DC2626', googlebooks: '#4285F4', applebooks: '#1D1D1F' };
+const SOURCE_LABELS = { npr: 'NPR Books', guardian: 'The Guardian', bookpage: 'BookPage', openlibrary: 'Open Library', nyt: 'NYT Bestsellers', googlebooks: 'Google Books', applebooks: 'Apple Books' };
 const SCRAPER_STATUS_COLORS = { scraped: '#8B5CF6', imported: T.ok, skipped: T.dim };
 
 const SourceBadge = ({ source }) => (

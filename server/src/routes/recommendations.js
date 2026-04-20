@@ -2,6 +2,7 @@ const express = require('express');
 const Book = require('../models/Book');
 const { openai, model } = require('../config/openai');
 const { withRetry } = require('../utils/retry');
+const externalBooks = require('../services/externalBooks');
 const logger = require('../utils/logger');
 const router = express.Router();
 
@@ -241,18 +242,25 @@ router.post('/', async (req, res, next) => {
 
     logger.info(`Generating recommendations: age=${ageRange}, moods=[${moods}], genres=[${genres}], pace=${paceRange}, candidates=${candidates.length}`);
 
-    const response = await withRetry(async () => {
-      return await openai.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 2000,
-      });
-    }, { label: 'AI Recommendations', maxAttempts: 2 });
+    // Fetch AI recommendations and external picks in parallel
+    const [response, externalPicks] = await Promise.all([
+      withRetry(async () => {
+        return await openai.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.7,
+          max_tokens: 2000,
+        });
+      }, { label: 'AI Recommendations', maxAttempts: 2 }),
+      externalBooks.searchBooks({ genres, moods, freeText }).catch(err => {
+        logger.warn(`External book search failed: ${err.message}`);
+        return [];
+      }),
+    ]);
 
     const content = response.choices[0].message.content;
     const tokensUsed = response.usage?.total_tokens || 0;
@@ -269,11 +277,12 @@ router.post('/', async (req, res, next) => {
     const validated = validateAIResponse(parsed, candidateIds);
     const recommendations = enrichRecommendations(validated.recommendations, candidates);
 
-    logger.info(`Recommendations generated: ${recommendations.length} books, ${tokensUsed} tokens`);
+    logger.info(`Recommendations generated: ${recommendations.length} books + ${externalPicks.length} external, ${tokensUsed} tokens`);
 
     res.json({
       prescription: validated.prescription,
       recommendations,
+      externalPicks,
       meta: {
         candidateCount: candidates.length,
         tokensUsed,

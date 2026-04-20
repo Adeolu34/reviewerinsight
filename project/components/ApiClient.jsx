@@ -68,6 +68,10 @@ const ApiClient = {
     return this._fetch('/stats');
   },
 
+  async getTrending() {
+    return this._fetch('/books/trending');
+  },
+
   async search(q, params = {}) {
     const qs = new URLSearchParams({ q, ...params }).toString();
     const result = await this._fetch(`/search?${qs}`);

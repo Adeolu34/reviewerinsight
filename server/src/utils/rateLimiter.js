@@ -38,5 +38,6 @@ const googleBooksLimiter = new RateLimiter({ maxTokens: 10, refillRate: 1.0, ref
 const openLibraryLimiter = new RateLimiter({ maxTokens: 3, refillRate: 1, refillIntervalMs: 1000 }); // 1 req/s
 
 const rssLimiter = new RateLimiter({ maxTokens: 2, refillRate: 0.5, refillIntervalMs: 1000 }); // 1 req per 2s
+const nytLimiter = new RateLimiter({ maxTokens: 5, refillRate: 0.083, refillIntervalMs: 1000 }); // ~5 req/min
 
-module.exports = { RateLimiter, googleBooksLimiter, openLibraryLimiter, rssLimiter };
+module.exports = { RateLimiter, googleBooksLimiter, openLibraryLimiter, rssLimiter, nytLimiter };

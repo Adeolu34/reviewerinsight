@@ -6,7 +6,7 @@ const scrapedBookSchema = new mongoose.Schema({
   source:              {
     type: String,
     required: true,
-    enum: ['npr', 'bookpage', 'guardian', 'openlibrary'],
+    enum: ['npr', 'bookpage', 'guardian', 'openlibrary', 'nyt', 'googlebooks', 'applebooks'],
     index: true,
   },
   sourceUrl:           { type: String },
