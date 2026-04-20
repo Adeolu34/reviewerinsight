@@ -3,6 +3,7 @@ const path = require('path');
 const config = require('./config/env');
 const { connectDB } = require('./config/database');
 const corsMiddleware = require('./middleware/cors');
+const securityHeaders = require('./middleware/securityHeaders');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const AgentOrchestrator = require('./agents/AgentOrchestrator');
@@ -29,6 +30,7 @@ async function startServer() {
 
   // Middleware
   app.use(corsMiddleware);
+  app.use(securityHeaders);
   app.use(express.json());
 
   // Serve the frontend static files

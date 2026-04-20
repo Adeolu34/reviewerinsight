@@ -1,14 +1,13 @@
 // API client and data-fetching hooks for Reviewer Insight
 // Falls back to static window.BOOKS data when server is unavailable.
 
-/** Same-origin on production; localhost:3001 when the UI is on another local port (e.g. Live Server). */
+/** Relative /api on production; localhost:3001 when the UI is on another local port (e.g. Live Server). */
 function defaultApiBase() {
   if (window.API_BASE != null && window.API_BASE !== '') return window.API_BASE;
   const h = window.location.hostname;
   const isLocal = h === 'localhost' || h === '127.0.0.1';
-  const port = window.location.port || '';
-  if (!isLocal) return `${window.location.origin}/api`;
-  if (port === '3001') return `${window.location.origin}/api`;
+  if (!isLocal) return '/api';
+  if (window.location.port === '3001') return '/api';
   return 'http://localhost:3001/api';
 }
 const API_BASE = defaultApiBase();

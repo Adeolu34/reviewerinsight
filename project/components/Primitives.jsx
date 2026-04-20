@@ -56,8 +56,8 @@ const Seal = ({ children, color = "#E8432C", rotate = -8, size = 96 }) => (
     width: size, height: size, borderRadius:'50%',
     border: `1.5px solid ${color}`, color, transform:`rotate(${rotate}deg)`,
     display:'flex', alignItems:'center', justifyContent:'center',
-    font:'700 10px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.18em',
-    textAlign:'center', padding: 8, lineHeight: 1.2, background: 'rgba(245,239,228,0.85)',
+    font:'700 10px/1.2 "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.18em',
+    textAlign:'center', padding: 8, background: 'rgba(245,239,228,0.85)',
     backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
     animation: 'ri-pulse 4s ease-in-out infinite',
     '--rot': `${rotate}deg`,
@@ -111,7 +111,7 @@ const Header = ({ route, setRoute, accent, dark }) => {
       transition: 'background .35s ease, box-shadow .35s ease',
       boxShadow: scrolled ? '0 4px 32px -8px rgba(20,18,16,0.12)' : 'none'
     }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 28px', font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', color: ink, borderBottom:`1px solid ${ink}`, opacity:.9, transition: 'padding .3s ease', ...(scrolled ? { padding: '6px 28px', fontSize: 10 } : {}) }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: scrolled ? '6px 28px' : '10px 28px', font: scrolled ? '600 10px "JetBrains Mono", monospace' : '600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', color: ink, borderBottom:`1px solid ${ink}`, opacity:.9, transition: 'padding .3s ease, font-size .3s ease' }}>
         <span>Issue No. 048 · April 18, 2026</span>
         <span style={{ display:'flex', gap: 18 }}>
           <span>Est. 2019</span>
@@ -124,7 +124,7 @@ const Header = ({ route, setRoute, accent, dark }) => {
       </div>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: scrolled ? '12px 28px' : '18px 28px', gap: 32, transition:'padding .3s ease' }}>
         <button onClick={()=>setRoute({name:'home'})} style={{ background:'none', border:0, padding:0, cursor:'pointer', textAlign:'left' }}>
-          <div style={{ font: scrolled ? '900 26px "DM Serif Display", Georgia, serif' : '900 34px "DM Serif Display", Georgia, serif', color: ink, lineHeight: .9, letterSpacing:'-.01em', transition: 'font-size .3s ease' }}>
+          <div style={{ font: scrolled ? '900 26px/.9 "DM Serif Display", Georgia, serif' : '900 34px/.9 "DM Serif Display", Georgia, serif', color: ink, letterSpacing:'-.01em', transition: 'font-size .3s ease' }}>
             Reviewer <span style={{ color: accent, fontStyle:'italic', transition: 'color .3s ease' }}>Insight</span>
           </div>
           {!scrolled && (
