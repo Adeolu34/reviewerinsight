@@ -577,6 +577,7 @@ router.get('/duplicates', async (req, res, next) => {
     const groups = new Map();
     for (const book of books) {
       const norm = normalize(book.title, book.author);
+      if (!norm.title || !norm.author) continue; // skip books that can't be normalized
       const key = `${norm.title}||${norm.author}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(book);

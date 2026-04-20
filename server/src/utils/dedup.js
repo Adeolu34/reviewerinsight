@@ -13,9 +13,9 @@ function normalize(title, author) {
   // Remove leading articles
   t = t.replace(/^(the|a|an)\s+/i, '');
 
-  // Remove punctuation, collapse whitespace
-  t = t.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-  a = a.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  // Remove punctuation, collapse whitespace (Unicode-aware: keep all letters/numbers)
+  t = t.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+  a = a.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
 
   // Take first author only
   a = a.split(/\s*(?:and|,|&)\s*/)[0].trim();
