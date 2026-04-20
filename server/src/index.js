@@ -14,6 +14,7 @@ const editorsRouter = require('./routes/editors');
 const searchRouter = require('./routes/search');
 const statsRouter = require('./routes/stats');
 const adminRouter = require('./routes/admin');
+const scraperRouter = require('./routes/scraper');
 const recommendationsRouter = require('./routes/recommendations');
 
 async function startServer() {
@@ -40,6 +41,7 @@ async function startServer() {
   app.use('/api/search', searchRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
 
   // Health check
@@ -68,6 +70,20 @@ async function startServer() {
   } else {
     logger.warn('OpenAI API key not configured — agent scheduling disabled');
   }
+
+  // Start daily competitor scraper schedule (1:00 AM UTC, before agent runs at 2 AM)
+  const cron = require('node-cron');
+  const { runAllScrapers } = require('./services/scrapers');
+  cron.schedule('0 1 * * *', async () => {
+    logger.info('[Scraper] Scheduled daily scrape started');
+    try {
+      await runAllScrapers('scheduled');
+      logger.info('[Scraper] Scheduled daily scrape completed');
+    } catch (err) {
+      logger.error(`[Scraper] Scheduled scrape failed: ${err.message}`);
+    }
+  }, { timezone: 'UTC' });
+  logger.info('Scraper schedule: daily at 1:00 AM UTC');
 
   app.listen(config.port, () => {
     logger.info(`Reviewer Insight server running on http://localhost:${config.port}`);

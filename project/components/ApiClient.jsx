@@ -212,6 +212,26 @@ const AdminClient = {
   retryBook(id, step = 'review') {
     return this._fetch(`/books/${id}/retry`, { method: 'POST', body: JSON.stringify({ step }) });
   },
+
+  // Scraper
+  getScrapedBooks(params = {})    { return this._fetch(`/scraped-books?${new URLSearchParams(params)}`); },
+  getScraperStatus()              { return this._fetch('/scraper/status'); },
+  getScraperRuns(params = {})     { return this._fetch(`/scraper/runs?${new URLSearchParams(params)}`); },
+  importScrapedBook(id, data = {}) {
+    return this._fetch(`/scraped-books/${id}/import`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  importScrapedBooksBulk(ids, data = {}) {
+    return this._fetch('/scraped-books/import-bulk', { method: 'POST', body: JSON.stringify({ ids, ...data }) });
+  },
+  deleteScrapedBook(id) {
+    return this._fetch(`/scraped-books/${id}`, { method: 'DELETE' });
+  },
+  updateScrapedBook(id, data) {
+    return this._fetch(`/scraped-books/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  triggerScraper(source) {
+    return this._fetch('/scraper/run', { method: 'POST', body: JSON.stringify(source ? { source } : {}) });
+  },
 };
 
 Object.assign(window, { ApiClient, AdminClient, useApi, checkApiAvailable, normalizeBook });

@@ -870,10 +870,388 @@ const AdminLogin = ({ onAuth }) => {
   );
 };
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION: Scraper
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SOURCE_COLORS = { npr: '#3B82F6', guardian: '#1E3A8A', bookpage: '#10B981', openlibrary: '#8B5CF6' };
+const SOURCE_LABELS = { npr: 'NPR Books', guardian: 'The Guardian', bookpage: 'BookPage', openlibrary: 'Open Library' };
+const SCRAPER_STATUS_COLORS = { scraped: '#8B5CF6', imported: T.ok, skipped: T.dim };
+
+const SourceBadge = ({ source }) => (
+  <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.04em', background: SOURCE_COLORS[source] || T.dim, color: '#fff' }}>
+    {SOURCE_LABELS[source] || source}
+  </span>
+);
+
+const ScraperSection = () => {
+  const [view, setView] = useState('books'); // 'books' | 'runs'
+  const [filters, setFilters] = useState({ source: '', status: '', search: '', page: 1 });
+  const [selected, setSelected] = useState(new Set());
+  const [modal, setModal] = useState(null); // 'import-bulk' | { type: 'import', book } | 'trigger'
+  const [scraping, setScraping] = useState(null); // source name while scraping
+  const [searchInput, setSearchInput] = useState('');
+  const debounceRef = useRef(null);
+
+  const { data: statusData, refresh: refreshStatus } = useAdminApi(() => AdminClient.getScraperStatus());
+  const { data, loading, refresh } = useAdminApi(
+    () => AdminClient.getScrapedBooks(Object.fromEntries(Object.entries(filters).filter(([, v]) => v))),
+    [filters]
+  );
+
+  const handleSearch = (v) => {
+    setSearchInput(v);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setFilters(f => ({ ...f, search: v, page: 1 })), 350);
+  };
+
+  const handleScrape = async (source) => {
+    setScraping(source || 'all');
+    try {
+      await AdminClient.triggerScraper(source);
+      refresh();
+      refreshStatus();
+    } catch (e) { alert(`Scrape failed: ${e.message}`); }
+    finally { setScraping(null); }
+  };
+
+  const handleSkip = async (book) => {
+    try {
+      await AdminClient.updateScrapedBook(book._id, { status: 'skipped' });
+      refresh(); refreshStatus();
+    } catch (e) { alert(e.message); }
+  };
+
+  const handleDelete = async (book) => {
+    try {
+      await AdminClient.deleteScrapedBook(book._id);
+      refresh(); refreshStatus();
+    } catch (e) { alert(e.message); }
+  };
+
+  const toggleSelect = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!data?.books) return;
+    const pending = data.books.filter(b => b.status === 'scraped');
+    if (selected.size === pending.length && pending.length > 0) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(pending.map(b => b._id)));
+    }
+  };
+
+  const stats = statusData?.stats || {};
+  const sourceStats = data?.sourceStats || [];
+  const maxSourceTotal = Math.max(...sourceStats.map(s => s.total), 1);
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      {/* Overview metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <Metric label="Total Scraped" value={fmtNum(stats.totalScraped || 0)} />
+        <Metric label="Pending Import" value={fmtNum(stats.totalPending || 0)} color="#8B5CF6" />
+        <Metric label="Imported" value={fmtNum(stats.totalImported || 0)} color={T.ok} />
+        <Metric label="Skipped" value={fmtNum(stats.totalSkipped || 0)} color={T.dim} />
+      </div>
+
+      {/* Source breakdown */}
+      {sourceStats.length > 0 && (
+        <Card title="By Source">
+          <div style={{ display: 'grid', gap: 10 }}>
+            {sourceStats.map(s => (
+              <div key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 110 }}><SourceBadge source={s._id} /></div>
+                <div style={{ flex: 1, height: 22, background: T.hover, borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ height: '100%', width: `${(s.total / maxSourceTotal) * 100}%`, background: SOURCE_COLORS[s._id] || T.accent, borderRadius: 4, transition: 'width .4s ease' }} />
+                </div>
+                <div style={{ width: 40, fontSize: 13, fontFamily: T.mono, fontWeight: 700, color: T.text, textAlign: 'right' }}>{s.total}</div>
+                <div style={{ width: 80, fontSize: 10, fontFamily: T.mono, color: T.muted }}>{s.scraped}p / {s.imported}i</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Trigger bar + view toggle */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Btn onClick={() => handleScrape(null)} disabled={!!scraping}>
+          {scraping === 'all' ? 'Scraping...' : 'Scrape All'}
+        </Btn>
+        {Object.keys(SOURCE_COLORS).map(s => (
+          <Btn key={s} small variant="ghost" onClick={() => handleScrape(s)} disabled={!!scraping}
+            style={{ borderColor: SOURCE_COLORS[s], color: scraping === s ? '#fff' : SOURCE_COLORS[s], background: scraping === s ? SOURCE_COLORS[s] : 'transparent' }}>
+            {scraping === s ? '...' : SOURCE_LABELS[s]}
+          </Btn>
+        ))}
+        <div style={{ flex: 1 }} />
+        <Btn small variant={view === 'books' ? 'primary' : 'ghost'} onClick={() => setView('books')}>Books</Btn>
+        <Btn small variant={view === 'runs' ? 'primary' : 'ghost'} onClick={() => setView('runs')}>Run History</Btn>
+        <Btn small variant="ghost" onClick={() => { refresh(); refreshStatus(); }}>Refresh</Btn>
+      </div>
+
+      {view === 'books' ? (
+        <>
+          {/* Filters */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10 }}>
+            <Input value={searchInput} onChange={handleSearch} placeholder="Search scraped books..." />
+            <Select value={filters.source} onChange={v => setFilters({ ...filters, source: v, page: 1 })}>
+              <option value="">All Sources</option>
+              {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+            <Select value={filters.status} onChange={v => setFilters({ ...filters, status: v, page: 1 })}>
+              <option value="">All Statuses</option>
+              <option value="scraped">Pending</option>
+              <option value="imported">Imported</option>
+              <option value="skipped">Skipped</option>
+            </Select>
+          </div>
+
+          {/* Bulk actions */}
+          {selected.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: `${T.accent}15`, border: `1px solid ${T.accent}40`, borderRadius: 8 }}>
+              <span style={{ fontSize: 13, fontFamily: T.mono, color: T.text, fontWeight: 600 }}>{selected.size} selected</span>
+              <Btn small onClick={() => setModal('import-bulk')}>Import Selected</Btn>
+              <Btn small variant="ghost" onClick={() => setSelected(new Set())}>Clear</Btn>
+            </div>
+          )}
+
+          {/* Table */}
+          {loading ? <div style={{ color: T.muted, fontFamily: T.mono, padding: 20 }}>Loading...</div> : (
+            <>
+              <div style={{ fontSize: 12, fontFamily: T.mono, color: T.muted }}>
+                Showing {data?.books?.length || 0} of {data?.total || 0} scraped books
+              </div>
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: T.hover }}>
+                      <th style={{ padding: '10px 8px', width: 36 }}>
+                        <input type="checkbox" onChange={toggleSelectAll}
+                          checked={data?.books?.filter(b => b.status === 'scraped').length > 0 && selected.size === data?.books?.filter(b => b.status === 'scraped').length}
+                          style={{ cursor: 'pointer' }} />
+                      </th>
+                      {[['Title', '26%'], ['Source', ''], ['Status', ''], ['Rating', ''], ['Year', ''], ['Scraped', ''], ['Actions', '140px']].map(([label, w]) => (
+                        <th key={label} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.08em', color: T.muted, width: w || undefined }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data?.books || []).map(book => (
+                      <tr key={book._id} style={{ borderTop: `1px solid ${T.border}`, transition: 'background .1s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = T.hover}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                          {book.status === 'scraped' && (
+                            <input type="checkbox" checked={selected.has(book._id)} onChange={() => toggleSelect(book._id)} style={{ cursor: 'pointer' }} />
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{book.title}</div>
+                          <div style={{ fontSize: 11, color: T.muted }}>{book.author}</div>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}><SourceBadge source={book.source} /></td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', background: SCRAPER_STATUS_COLORS[book.status] || T.dim, color: '#fff' }}>
+                            {book.status === 'scraped' ? 'pending' : book.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: T.mono, color: T.muted }}>{book.sourceRating || '\u2014'}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: T.mono, color: T.muted }}>{book.year || '\u2014'}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: T.mono, color: T.muted }}>{fmtDate(book.scrapedAt)}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {book.status === 'scraped' && (
+                              <>
+                                <Btn small onClick={(e) => { e.stopPropagation(); setModal({ type: 'import', book }); }}>Import</Btn>
+                                <Btn small variant="ghost" onClick={(e) => { e.stopPropagation(); handleSkip(book); }}>Skip</Btn>
+                              </>
+                            )}
+                            <Btn small variant="danger" onClick={(e) => { e.stopPropagation(); handleDelete(book); }}>Del</Btn>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {(data?.books || []).length === 0 && (
+                      <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: T.dim, fontFamily: T.mono, fontSize: 12 }}>No scraped books found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={filters.page} totalPages={data?.totalPages} onChange={p => setFilters({ ...filters, page: p })} />
+            </>
+          )}
+        </>
+      ) : (
+        <ScraperRunsView />
+      )}
+
+      {/* Import Modal (single) */}
+      {modal?.type === 'import' && (
+        <ImportScrapedModal book={modal.book} onClose={() => setModal(null)} onDone={() => { setModal(null); refresh(); refreshStatus(); }} />
+      )}
+
+      {/* Import Modal (bulk) */}
+      {modal === 'import-bulk' && (
+        <ImportBulkModal ids={[...selected]} onClose={() => setModal(null)} onDone={() => { setModal(null); setSelected(new Set()); refresh(); refreshStatus(); }} />
+      )}
+    </div>
+  );
+};
+
+const ImportScrapedModal = ({ book, onClose, onDone }) => {
+  const [editor, setEditor] = useState('Mira Okafor');
+  const [genre, setGenre] = useState(book.genre || 'Fiction');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const go = async () => {
+    setBusy(true); setMsg('');
+    try {
+      await AdminClient.importScrapedBook(book._id, { editor, genre });
+      onDone();
+    } catch (e) { setMsg(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Modal title={`Import: ${book.title}`} onClose={onClose} width={460}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        <div style={{ padding: 12, background: T.hover, borderRadius: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{book.title}</div>
+          <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>by {book.author}</div>
+          {book.sourceReviewSnippet && (
+            <div style={{ fontSize: 11, color: T.dim, marginTop: 8, fontStyle: 'italic', lineHeight: 1.5 }}>
+              "{book.sourceReviewSnippet.substring(0, 200)}..."
+            </div>
+          )}
+        </div>
+        <div>
+          <Label>Assign Editor</Label>
+          <Select value={editor} onChange={setEditor} style={{ width: '100%' }}>
+            <option>Mira Okafor</option><option>Jules Park</option><option>Dae Han</option><option>Noor Saleh</option>
+          </Select>
+        </div>
+        <div>
+          <Label>Genre</Label>
+          <Select value={genre} onChange={setGenre} style={{ width: '100%' }}>
+            <option>Fiction</option><option>Essays</option><option>Memoir</option><option>Sci-Fi</option>
+            <option>History</option><option>Business</option><option>Nature</option>
+          </Select>
+        </div>
+        {msg && <div style={{ color: T.err, fontSize: 12, fontFamily: T.mono }}>{msg}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn onClick={go} disabled={busy}>{busy ? 'Importing...' : 'Import to Pipeline'}</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const ImportBulkModal = ({ ids, onClose, onDone }) => {
+  const [editor, setEditor] = useState('Mira Okafor');
+  const [genre, setGenre] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const go = async () => {
+    setBusy(true);
+    try {
+      const data = { editor };
+      if (genre) data.genre = genre;
+      const res = await AdminClient.importScrapedBooksBulk(ids, data);
+      setResult(res);
+      setTimeout(onDone, 2000);
+    } catch (e) { setResult({ error: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Modal title={`Bulk Import (${ids.length} books)`} onClose={onClose} width={460}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        <div style={{ fontSize: 13, color: T.muted }}>
+          Import {ids.length} scraped books into the review pipeline.
+        </div>
+        <div>
+          <Label>Assign Editor</Label>
+          <Select value={editor} onChange={setEditor} style={{ width: '100%' }}>
+            <option>Mira Okafor</option><option>Jules Park</option><option>Dae Han</option><option>Noor Saleh</option>
+          </Select>
+        </div>
+        <div>
+          <Label>Genre Override (optional)</Label>
+          <Select value={genre} onChange={setGenre} style={{ width: '100%' }}>
+            <option value="">Use scraped genre</option>
+            <option>Fiction</option><option>Essays</option><option>Memoir</option><option>Sci-Fi</option>
+            <option>History</option><option>Business</option><option>Nature</option>
+          </Select>
+        </div>
+        {result && !result.error && (
+          <div style={{ padding: 10, background: `${T.ok}20`, borderRadius: 6, fontSize: 12, fontFamily: T.mono, color: T.ok }}>
+            Imported: {result.imported} | Skipped: {result.skipped} | Failed: {result.failed}
+          </div>
+        )}
+        {result?.error && (
+          <div style={{ padding: 10, background: `${T.err}20`, borderRadius: 6, fontSize: 12, fontFamily: T.mono, color: T.err }}>{result.error}</div>
+        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn onClick={go} disabled={busy || !!result}>{busy ? 'Importing...' : 'Import All'}</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const ScraperRunsView = () => {
+  const [filters, setFilters] = useState({ source: '', page: 1 });
+  const { data, loading, refresh } = useAdminApi(() => AdminClient.getScraperRuns(filters), [filters]);
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <Select value={filters.source} onChange={v => setFilters({ ...filters, source: v, page: 1 })}>
+          <option value="">All Sources</option>
+          {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </Select>
+        <div style={{ flex: 1 }} />
+        <Btn small variant="ghost" onClick={refresh}>Refresh</Btn>
+      </div>
+
+      {loading ? <div style={{ color: T.muted, fontFamily: T.mono, padding: 20 }}>Loading...</div> : (
+        <>
+          <Table
+            columns={[
+              { key: 'source', label: 'Source', render: v => <SourceBadge source={v} /> },
+              { key: 'trigger', label: 'Trigger', mono: true },
+              { key: 'status', label: 'Status', render: v => <StatusBadge status={v} /> },
+              { key: 'booksFound', label: 'Found', mono: true },
+              { key: 'booksNew', label: 'New', mono: true },
+              { key: 'booksDuplicate', label: 'Dup', mono: true },
+              { key: 'booksFailed', label: 'Failed', render: v => <span style={{ color: v > 0 ? T.err : T.dim }}>{v}</span>, mono: true },
+              { key: 'durationMs', label: 'Duration', render: v => fmtDur(v), mono: true },
+              { key: 'startedAt', label: 'Started', render: v => fmtTime(v), mono: true },
+            ]}
+            rows={data?.runs || []}
+          />
+          <Pagination page={filters.page} totalPages={data?.totalPages} onChange={p => setFilters({ ...filters, page: p })} />
+        </>
+      )}
+    </div>
+  );
+};
+
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: '◐' },
   { id: 'runs', label: 'Agent Runs', icon: '▶' },
   { id: 'books', label: 'Books', icon: '▤' },
+  { id: 'scraper', label: 'Scraper', icon: '⇣' },
   { id: 'editors', label: 'Editors', icon: '✎' },
   { id: 'analytics', label: 'Analytics', icon: '◔' },
   { id: 'system', label: 'System', icon: '⚙' },
@@ -895,6 +1273,7 @@ const Admin = ({ setRoute }) => {
     overview: OverviewSection,
     runs: RunsSection,
     books: BooksSection,
+    scraper: ScraperSection,
     editors: EditorsSection,
     analytics: AnalyticsSection,
     system: SystemSection,
