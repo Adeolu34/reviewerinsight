@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /reviewadmin
+Disallow: /api/
+
+Sitemap: https://reviewerinsight.com/sitemap.xml

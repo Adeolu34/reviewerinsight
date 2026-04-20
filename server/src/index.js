@@ -18,6 +18,8 @@ const adminRouter = require('./routes/admin');
 const scraperRouter = require('./routes/scraper');
 const recommendationsRouter = require('./routes/recommendations');
 const trendingRouter = require('./routes/trending');
+const sitemapRouter = require('./routes/sitemap');
+const seoMiddleware = require('./middleware/seoMiddleware');
 
 async function startServer() {
   // Connect to MongoDB
@@ -53,12 +55,15 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Fallback: serve the frontend for non-API routes
-  app.get('*', (req, res) => {
+  // Sitemap (before catch-all)
+  app.use(sitemapRouter);
+
+  // Fallback: serve the frontend with SEO meta injection for non-API routes
+  app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'API endpoint not found' });
     }
-    res.sendFile(path.join(__dirname, '../../project/Reviewer Insight.html'));
+    seoMiddleware(req, res, next);
   });
 
   // Error handler (must be last)

@@ -2,8 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=1440"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Reviewer Insight — Reviews, Summaries, A Good Read</title>
+<meta name="description" content="In-depth book reviews, AI-powered summaries, chapter breakdowns, and personalized reading recommendations. Discover your next great read on Reviewer Insight."/>
+<link rel="canonical" href="https://reviewerinsight.com/"/>
+<meta name="theme-color" content="#141210"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='12' width='100' height='100' fill='%23141210'/><text x='50' y='72' font-size='60' text-anchor='middle' fill='%23E8432C' font-family='serif' font-weight='bold'>RI</text></svg>"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Reviewer Insight"/>
+<meta property="og:title" content="Reviewer Insight — Reviews, Summaries, A Good Read"/>
+<meta property="og:description" content="In-depth book reviews, AI-powered summaries, chapter breakdowns, and personalized reading recommendations."/>
+<meta property="og:url" content="https://reviewerinsight.com/"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Reviewer Insight — Reviews, Summaries, A Good Read"/>
+<meta name="twitter:description" content="In-depth book reviews, AI-powered summaries, and personalized reading recommendations."/>
+<!--SEO_INJECT-->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
@@ -213,23 +226,65 @@
 <script type="text/babel" src="components/Admin.jsx"></script>
 
 <script type="text/babel">
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useCallback } = React;
+
+  // ─── URL ↔ Route helpers ───
+  function routeToPath(r) {
+    if (!r) return '/';
+    switch (r.name) {
+      case 'home': return '/';
+      case 'browse': return '/browse';
+      case 'recommend': return '/recommend';
+      case 'editors': return '/editors';
+      case 'membership': return '/membership';
+      case 'admin': return '/reviewadmin';
+      case 'review': {
+        const id = r.id || '';
+        return `/book/${id}`;
+      }
+      default: return '/';
+    }
+  }
+
+  function pathToRoute(pathname) {
+    const p = pathname || '/';
+    if (p === '/' || p === '') return { name: 'home' };
+    if (p === '/browse') return { name: 'browse' };
+    if (p === '/recommend') return { name: 'recommend' };
+    if (p === '/editors') return { name: 'editors' };
+    if (p === '/membership') return { name: 'membership' };
+    if (p === '/reviewadmin') return { name: 'admin' };
+    const bookMatch = p.match(/^\/book\/([a-f0-9]+)/i);
+    if (bookMatch) return { name: 'review', id: bookMatch[1] };
+    return { name: 'home' };
+  }
 
   function App() {
-    const [route, setRoute] = useState(() => {
+    const [route, setRouteState] = useState(() => {
       try {
-        if (window.location.pathname === '/reviewadmin') return { name: 'admin' };
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('admin') === '1') return { name: 'admin' };
-        const saved = JSON.parse(localStorage.getItem('ri-route') || 'null');
-        return saved || { name: 'home' };
+        return pathToRoute(window.location.pathname);
       } catch { return { name: 'home' }; }
     });
     const [tweaks, setTweaks] = useState(window.TWEAK_DEFAULTS);
     const [tweaksOpen, setTweaksOpen] = useState(false);
 
+    const setRoute = useCallback((r) => {
+      const newRoute = typeof r === 'string' ? { name: r } : r;
+      const newPath = routeToPath(newRoute);
+      if (window.location.pathname !== newPath) {
+        window.history.pushState(newRoute, '', newPath);
+      }
+      setRouteState(newRoute);
+    }, []);
+
+    // Browser back/forward
     useEffect(() => {
-      if (route.name !== 'admin') localStorage.setItem('ri-route', JSON.stringify(route));
+      const onPopState = () => setRouteState(pathToRoute(window.location.pathname));
+      window.addEventListener('popstate', onPopState);
+      return () => window.removeEventListener('popstate', onPopState);
+    }, []);
+
+    useEffect(() => {
       window.scrollTo(0, 0);
     }, [route]);
 
