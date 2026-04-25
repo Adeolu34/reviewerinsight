@@ -1387,12 +1387,97 @@ const DuplicatesSection = () => {
   );
 };
 
+// ━━━ COMPETITOR INSIGHTS SECTION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const TYPE_COLOR = { editorial: '#8B5CF6', professional: '#3B82F6', bestseller: '#F59E0B', catalog: '#10B981', other: '#6B7280' };
+
+const CompetitorSection = () => {
+  const { data, loading, refresh } = useAdminApi(() => AdminClient.getCompetitorInsights());
+  const [scraping, setScraping] = useState(null);
+
+  const handleScrape = async (source) => {
+    setScraping(source);
+    try {
+      await AdminClient.triggerScraper(source);
+      setTimeout(refresh, 1500);
+    } catch (e) { alert(`Scrape failed: ${e.message}`); }
+    finally { setScraping(null); }
+  };
+
+  if (loading || !data) return <div style={{ color: T.muted, fontFamily: T.mono, fontSize: 12 }}>Loading competitor data…</div>;
+
+  const { insights = [], totals = {} } = data;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Summary metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <Metric label="Sources Active" value={totals.sources || 0} />
+        <Metric label="Total Scraped" value={fmtNum(totals.totalScraped)} color={T.info} />
+        <Metric label="Imported to Catalog" value={fmtNum(totals.totalImported)} color={T.ok}
+          sub={totals.totalPending ? `${fmtNum(totals.totalPending)} pending` : null} />
+      </div>
+
+      {/* Source breakdown */}
+      <Card title="Source Coverage">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: T.mono }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+              {['Source', 'Type', 'Scraped', 'Imported', 'Pending', 'Last Run', 'Status', ''].map(h => (
+                <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: T.muted, fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {insights.map(row => (
+              <tr key={row.source} style={{ borderBottom: `1px solid ${T.border}22` }}>
+                <td style={{ padding: '8px 10px', color: T.text, fontWeight: 600 }}>
+                  <div>{row.label}</div>
+                  {row.url && <a href={row.url} target="_blank" rel="noopener noreferrer" style={{ color: T.dim, fontSize: 10, textDecoration: 'none' }}>{row.url.replace(/^https?:\/\//, '')}</a>}
+                </td>
+                <td style={{ padding: '8px 10px' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: `${TYPE_COLOR[row.type] || T.dim}22`, color: TYPE_COLOR[row.type] || T.dim }}>
+                    {row.type}
+                  </span>
+                </td>
+                <td style={{ padding: '8px 10px', color: T.text }}>{fmtNum(row.totalScraped)}</td>
+                <td style={{ padding: '8px 10px', color: T.ok }}>{fmtNum(row.imported)}</td>
+                <td style={{ padding: '8px 10px', color: row.pending > 0 ? T.warn : T.dim }}>{fmtNum(row.pending)}</td>
+                <td style={{ padding: '8px 10px', color: T.muted, whiteSpace: 'nowrap' }}>{row.lastRun ? fmtDate(row.lastRun) : '—'}</td>
+                <td style={{ padding: '8px 10px' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                    background: row.lastStatus === 'completed' ? `${T.ok}22` : row.lastStatus === 'failed' ? `${T.err}22` : row.lastStatus === 'never' ? `${T.dim}22` : `${T.info}22`,
+                    color: row.lastStatus === 'completed' ? T.ok : row.lastStatus === 'failed' ? T.err : row.lastStatus === 'never' ? T.dim : T.info }}>
+                    {row.lastStatus}
+                  </span>
+                </td>
+                <td style={{ padding: '8px 10px' }}>
+                  <Btn small variant="ghost" disabled={scraping === row.source} onClick={() => handleScrape(row.source)}>
+                    {scraping === row.source ? '…' : 'Scrape'}
+                  </Btn>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      {/* Run all button */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        <Btn variant="primary" disabled={!!scraping} onClick={() => handleScrape(null)}>
+          {scraping ? `Scraping ${scraping}…` : 'Run All Sources'}
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: '◐' },
   { id: 'runs', label: 'Agent Runs', icon: '▶' },
   { id: 'books', label: 'Books', icon: '▤' },
   { id: 'scraper', label: 'Scraper', icon: '⇣' },
   { id: 'duplicates', label: 'Duplicates', icon: '⊘' },
+  { id: 'competitors', label: 'Competitors', icon: '◈' },
   { id: 'editors', label: 'Editors', icon: '✎' },
   { id: 'analytics', label: 'Analytics', icon: '◔' },
   { id: 'system', label: 'System', icon: '⚙' },
@@ -1416,6 +1501,7 @@ const Admin = ({ setRoute }) => {
     books: BooksSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
+    competitors: CompetitorSection,
     editors: EditorsSection,
     analytics: AnalyticsSection,
     system: SystemSection,

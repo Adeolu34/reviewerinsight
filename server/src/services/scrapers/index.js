@@ -11,6 +11,14 @@ const OpenLibraryBulkScraper = require('./openLibraryBulk');
 const NytBestsellersScraper = require('./nytBestsellers');
 const GoogleBooksTrendingScraper = require('./googleBooksTrending');
 const AppleBooksTopScraper = require('./appleBooksTop');
+const LiteraryHubScraper = require('./literaryHub');
+const BookRiotScraper = require('./bookRiot');
+const KirkusReviewsScraper = require('./kirkusReviews');
+const NyReviewOfBooksScraper = require('./nyReviewOfBooks');
+const TheMillionsScraper = require('./theMillions');
+const PublishersWeeklyScraper = require('./publishersWeekly');
+const TorBooksScraper = require('./torBooks');
+const ShelfAwarenessScraper = require('./shelfAwareness');
 
 const SCRAPERS = {
   npr: new NprBooksScraper(),
@@ -21,6 +29,15 @@ const SCRAPERS = {
   nyt: new NytBestsellersScraper(),
   googlebooks: new GoogleBooksTrendingScraper(),
   applebooks: new AppleBooksTopScraper(),
+  // Competitor / editorial sources
+  lithub: new LiteraryHubScraper(),
+  bookriot: new BookRiotScraper(),
+  kirkus: new KirkusReviewsScraper(),
+  nybooks: new NyReviewOfBooksScraper(),
+  themillions: new TheMillionsScraper(),
+  pw: new PublishersWeeklyScraper(),
+  tor: new TorBooksScraper(),
+  shelfawareness: new ShelfAwarenessScraper(),
 };
 
 /**

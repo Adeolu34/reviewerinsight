@@ -236,6 +236,9 @@ const AdminClient = {
     return this._fetch('/scraper/run', { method: 'POST', body: JSON.stringify(source ? { source } : {}) });
   },
 
+  // Competitor insights
+  getCompetitorInsights() { return this._fetch('/competitor-insights'); },
+
   // Duplicates
   getDuplicates()         { return this._fetch('/duplicates'); },
   mergeDuplicates(keepId, removeIds) {

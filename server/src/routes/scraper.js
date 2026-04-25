@@ -232,6 +232,78 @@ router.get('/scraper/status', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── GET /api/admin/competitor-insights ──────────────────────
+// Returns per-source stats: total scraped, imported, pending, last run date/status.
+router.get('/competitor-insights', async (req, res, next) => {
+  try {
+    const sources = getAvailableSources();
+
+    const SOURCE_META = {
+      npr:            { label: 'NPR Books',              type: 'editorial', url: 'https://npr.org/books' },
+      guardian:       { label: 'The Guardian Books',     type: 'editorial', url: 'https://theguardian.com/books' },
+      bookpage:       { label: 'BookPage',               type: 'editorial', url: 'https://bookpage.com' },
+      lithub:         { label: 'Literary Hub + CrimeReads', type: 'editorial', url: 'https://lithub.com' },
+      bookriot:       { label: 'Book Riot',              type: 'editorial', url: 'https://bookriot.com' },
+      kirkus:         { label: 'Kirkus Reviews',         type: 'professional', url: 'https://kirkusreviews.com' },
+      nybooks:        { label: 'NY Review of Books',     type: 'professional', url: 'https://nybooks.com' },
+      themillions:    { label: 'The Millions',           type: 'editorial', url: 'https://themillions.com' },
+      pw:             { label: 'Publishers Weekly',      type: 'professional', url: 'https://publishersweekly.com' },
+      tor:            { label: 'Tor.com',                type: 'editorial', url: 'https://tor.com' },
+      shelfawareness: { label: 'Shelf Awareness',        type: 'professional', url: 'https://shelf-awareness.com' },
+      nyt:            { label: 'NYT Bestsellers',        type: 'bestseller', url: 'https://nytimes.com/books' },
+      googlebooks:    { label: 'Google Books',           type: 'catalog', url: 'https://books.google.com' },
+      applebooks:     { label: 'Apple Books Top Charts', type: 'bestseller', url: 'https://books.apple.com' },
+      openlibrary:    { label: 'Open Library Trending',  type: 'catalog', url: 'https://openlibrary.org' },
+      openlibraryBulk:{ label: 'Open Library Bulk',     type: 'catalog', url: 'https://openlibrary.org' },
+    };
+
+    const [scraped, lastRuns] = await Promise.all([
+      ScrapedBook.aggregate([
+        { $group: {
+          _id: '$source',
+          total: { $sum: 1 },
+          imported: { $sum: { $cond: [{ $eq: ['$status', 'imported'] }, 1, 0] } },
+          pending: { $sum: { $cond: [{ $eq: ['$status', 'scraped'] }, 1, 0] } },
+          skipped: { $sum: { $cond: [{ $eq: ['$status', 'skipped'] }, 1, 0] } },
+        }},
+      ]),
+      ScraperRun.aggregate([
+        { $sort: { startedAt: -1 } },
+        { $group: {
+          _id: '$source',
+          lastRun: { $first: '$startedAt' },
+          lastStatus: { $first: '$status' },
+          lastBooksNew: { $first: '$booksNew' },
+        }},
+      ]),
+    ]);
+
+    const scraped_ = Object.fromEntries(scraped.map(s => [s._id, s]));
+    const lastRuns_ = Object.fromEntries(lastRuns.map(r => [r._id, r]));
+
+    const insights = sources.map(source => ({
+      source,
+      ...(SOURCE_META[source] || { label: source, type: 'other', url: null }),
+      totalScraped: scraped_[source]?.total || 0,
+      imported: scraped_[source]?.imported || 0,
+      pending: scraped_[source]?.pending || 0,
+      skipped: scraped_[source]?.skipped || 0,
+      lastRun: lastRuns_[source]?.lastRun || null,
+      lastStatus: lastRuns_[source]?.lastStatus || 'never',
+      lastBooksNew: lastRuns_[source]?.lastBooksNew || 0,
+    }));
+
+    const totals = {
+      sources: sources.length,
+      totalScraped: scraped.reduce((s, r) => s + r.total, 0),
+      totalImported: scraped.reduce((s, r) => s + r.imported, 0),
+      totalPending: scraped.reduce((s, r) => s + r.pending, 0),
+    };
+
+    res.json({ insights, totals });
+  } catch (err) { next(err); }
+});
+
 // ─── GET /api/admin/scraper/runs ─────────────────────────────
 router.get('/scraper/runs', async (req, res, next) => {
   try {
