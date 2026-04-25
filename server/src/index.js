@@ -80,9 +80,11 @@ async function startServer() {
     logger.warn('OpenAI API key not configured — agent scheduling disabled');
   }
 
-  // Start daily competitor scraper schedule (1:00 AM UTC, before agent runs at 2 AM)
   const cron = require('node-cron');
   const { runAllScrapers } = require('./services/scrapers');
+  const { autoImportBatch } = require('./services/autoImport');
+
+  // Daily scrape: all sources at 1:00 AM UTC (before agent runs)
   cron.schedule('0 1 * * *', async () => {
     logger.info('[Scraper] Scheduled daily scrape started');
     try {
@@ -93,6 +95,19 @@ async function startServer() {
     }
   }, { timezone: 'UTC' });
   logger.info('Scraper schedule: daily at 1:00 AM UTC');
+
+  // Auto-import: promote pending scraped books into the review queue every 30 min
+  cron.schedule('*/30 * * * *', async () => {
+    try {
+      const stats = await autoImportBatch(500);
+      if (stats.imported > 0) {
+        logger.info(`[AutoImport] ${stats.imported} books added to review queue`);
+      }
+    } catch (err) {
+      logger.error(`[AutoImport] Batch failed: ${err.message}`);
+    }
+  }, { timezone: 'UTC' });
+  logger.info('AutoImport schedule: every 30 minutes');
 
   app.listen(config.port, () => {
     logger.info(`Reviewer Insight server running on http://localhost:${config.port}`);

@@ -7,6 +7,7 @@ const NprBooksScraper = require('./nprBooks');
 const GuardianBooksScraper = require('./guardianBooks');
 const BookPageScraper = require('./bookPage');
 const OpenLibraryScraper = require('./openLibrary');
+const OpenLibraryBulkScraper = require('./openLibraryBulk');
 const NytBestsellersScraper = require('./nytBestsellers');
 const GoogleBooksTrendingScraper = require('./googleBooksTrending');
 const AppleBooksTopScraper = require('./appleBooksTop');
@@ -16,6 +17,7 @@ const SCRAPERS = {
   guardian: new GuardianBooksScraper(),
   bookpage: new BookPageScraper(),
   openlibrary: new OpenLibraryScraper(),
+  openlibraryBulk: new OpenLibraryBulkScraper(),
   nyt: new NytBestsellersScraper(),
   googlebooks: new GoogleBooksTrendingScraper(),
   applebooks: new AppleBooksTopScraper(),
@@ -85,4 +87,44 @@ function getAvailableSources() {
   return Object.keys(SCRAPERS);
 }
 
-module.exports = { runScraper, runAllScrapers, getAvailableSources };
+/**
+ * Start a scraper in the background — returns the run ID immediately
+ * without waiting for completion. Designed for HTTP endpoints where
+ * long-running scrapers (e.g. openlibraryBulk) would otherwise time out.
+ */
+async function startScraper(sourceName, trigger = 'manual') {
+  const scraper = SCRAPERS[sourceName];
+  if (!scraper) {
+    throw new Error(`Unknown scraper: "${sourceName}". Available: ${Object.keys(SCRAPERS).join(', ')}`);
+  }
+
+  const run = await ScraperRun.create({ source: sourceName, trigger, status: 'running' });
+  logger.info(`[Scraper] Background start: ${sourceName} (run: ${run._id})`);
+
+  // Fire and forget — update the run record when it completes
+  scraper.run(run._id).then(async stats => {
+    run.booksFound = stats.booksFound;
+    run.booksNew = stats.booksNew;
+    run.booksDuplicate = stats.booksDuplicate;
+    run.booksFailed = stats.booksFailed;
+    run.errors = stats.errors;
+    run.status = stats.booksFailed > 0 && stats.booksNew > 0 ? 'partial'
+               : stats.booksFailed > 0 && stats.booksNew === 0 ? 'failed'
+               : 'completed';
+    run.completedAt = new Date();
+    run.durationMs = Date.now() - run.startedAt.getTime();
+    await run.save();
+    logger.info(`[Scraper] ${sourceName} background run done — ${stats.booksNew} new books`);
+  }).catch(async err => {
+    run.status = 'failed';
+    run.completedAt = new Date();
+    run.durationMs = Date.now() - run.startedAt.getTime();
+    run.errors.push({ title: 'scraper', error: err.message, timestamp: new Date() });
+    await run.save();
+    logger.error(`[Scraper] ${sourceName} background run failed: ${err.message}`);
+  });
+
+  return run._id.toString();
+}
+
+module.exports = { runScraper, runAllScrapers, startScraper, getAvailableSources };

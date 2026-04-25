@@ -15,24 +15,24 @@ class AgentOrchestrator {
 
   /**
    * Start scheduled agent runs.
-   * Schedule: All 4 editors run daily, staggered by 30 minutes.
-   *   2:00 AM UTC — Mira Okafor  (8 books)
-   *   2:30 AM UTC — Jules Park   (8 books)
-   *   3:00 AM UTC — Dae Han      (7 books)
-   *   3:30 AM UTC — Noor Saleh   (7 books)
-   * Total: ~30 books/day
+   * Schedule: All 4 editors run every 6 hours, staggered by 15 minutes.
+   *   :00 UTC — Mira Okafor  (50 books × 4 runs = 200/day)
+   *   :15 UTC — Jules Park   (50 books × 4 runs = 200/day)
+   *   :30 UTC — Dae Han      (50 books × 4 runs = 200/day)
+   *   :45 UTC — Noor Saleh   (50 books × 4 runs = 200/day)
+   * Total: ~800 books/day reviewed
    */
   startSchedule() {
     const schedule = [
-      { cron: '0 2 * * *',  editor: 'Mira Okafor', batchSize: 8 },   // Daily 2:00 AM UTC
-      { cron: '30 2 * * *', editor: 'Jules Park',  batchSize: 8 },   // Daily 2:30 AM UTC
-      { cron: '0 3 * * *',  editor: 'Dae Han',     batchSize: 7 },   // Daily 3:00 AM UTC
-      { cron: '30 3 * * *', editor: 'Noor Saleh',  batchSize: 7 },   // Daily 3:30 AM UTC
+      { cron: '0 */6 * * *',  editor: 'Mira Okafor', batchSize: 50 },
+      { cron: '15 */6 * * *', editor: 'Jules Park',  batchSize: 50 },
+      { cron: '30 */6 * * *', editor: 'Dae Han',     batchSize: 50 },
+      { cron: '45 */6 * * *', editor: 'Noor Saleh',  batchSize: 50 },
     ];
 
     for (const { cron: cronExpr, editor, batchSize } of schedule) {
       const job = cron.schedule(cronExpr, async () => {
-        logger.info(`Scheduled daily run triggered for ${editor} (batch: ${batchSize})`);
+        logger.info(`Scheduled run triggered for ${editor} (batch: ${batchSize})`);
         try {
           await this.runAgent(editor, { batchSize });
         } catch (err) {
@@ -44,7 +44,7 @@ class AgentOrchestrator {
       logger.info(`Scheduled ${editor}: ${cronExpr} UTC (batch: ${batchSize})`);
     }
 
-    logger.info('Agent orchestrator started with daily schedule (4 editors, ~30 books/day)');
+    logger.info('Agent orchestrator started — 4 editors × every 6h × 50 books = ~800 books/day');
   }
 
   /**

@@ -3,7 +3,7 @@ const ScrapedBook = require('../models/ScrapedBook');
 const ScraperRun = require('../models/ScraperRun');
 const Book = require('../models/Book');
 const { generateCoverDesign } = require('../services/coverResolver');
-const { runScraper, runAllScrapers, getAvailableSources } = require('../services/scrapers');
+const { startScraper, runAllScrapers, getAvailableSources } = require('../services/scrapers');
 const requireAdmin = require('../middleware/requireAdmin');
 const router = express.Router();
 
@@ -178,6 +178,7 @@ router.delete('/scraped-books/:id', async (req, res, next) => {
 });
 
 // ─── POST /api/admin/scraper/run ─────────────────────────────
+// Always non-blocking: returns run ID(s) immediately, scraper runs in background.
 router.post('/scraper/run', async (req, res, next) => {
   try {
     const { source } = req.body;
@@ -187,11 +188,18 @@ router.post('/scraper/run', async (req, res, next) => {
       if (!available.includes(source)) {
         return res.status(400).json({ error: `Unknown source: ${source}. Available: ${available.join(', ')}` });
       }
-      const runId = await runScraper(source, 'manual');
-      res.json({ runId, source, status: 'completed' });
+      const runId = await startScraper(source, 'manual');
+      res.json({ runId, source, status: 'started' });
     } else {
-      const results = await runAllScrapers('manual');
-      res.json({ results, status: 'completed' });
+      const runIds = {};
+      for (const src of getAvailableSources()) {
+        try {
+          runIds[src] = await startScraper(src, 'manual');
+        } catch (err) {
+          runIds[src] = { error: err.message };
+        }
+      }
+      res.json({ runIds, status: 'started' });
     }
   } catch (err) { next(err); }
 });

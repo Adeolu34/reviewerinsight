@@ -5,17 +5,53 @@ const { generateReview, generateChapterSummary } = require('../services/openaiRe
 const { generateCoverDesign } = require('../services/coverResolver');
 const logger = require('../utils/logger');
 
+// Concurrent requests to OpenAI — high enough to be fast, low enough to
+// stay well within rate limits (gpt-4o allows 10k RPM).
+const REVIEW_CONCURRENCY = 5;
+const CHAPTER_CONCURRENCY = 3;
+
+// ─── Per-book helpers ────────────────────────────────────────────────────────
+
+async function generateAndSaveReview(book, persona) {
+  const { review, tokensUsed } = await generateReview(book, persona);
+  await Book.findByIdAndUpdate(book._id, {
+    blurb: review.blurb,
+    takeaways: review.takeaways,
+    rating: review.rating,
+    review: {
+      headline: review.headline,
+      stand: review.stand,
+      paragraphs: review.paragraphs,
+      pullQuote: review.pullQuote,
+      summaryBullets: review.summaryBullets,
+    },
+    status: 'published',
+    'sources.reviewGeneratedAt': new Date(),
+  });
+  return { tokensUsed };
+}
+
+async function generateAndSaveChapters(book, persona) {
+  const { chapterSummaries, tokensUsed } = await generateChapterSummary(book, persona);
+  await Book.findByIdAndUpdate(book._id, {
+    chapterSummaries,
+    'sources.chapterSummariesGeneratedAt': new Date(),
+  });
+  return { tokensUsed };
+}
+
+// ─── Main pipeline ──────────────────────────────────────────────────────────
+
 /**
- * Run the full pipeline: discover → enrich → generate review → save.
- * @param {Object} persona - Editor persona with searchQueries and systemPrompt
+ * Run the full pipeline: discover → review → chapter summaries.
+ * @param {Object} persona - Editor persona
  * @param {Object} options - { batchSize, backfill }
  * @returns {string} AgentRun ID
  */
 async function runPipeline(persona, options = {}) {
-  const { batchSize = 10, backfill = false } = options;
+  const { batchSize = 50, backfill = false } = options;
   const currentYear = new Date().getFullYear();
 
-  // Create agent run log
   const run = await AgentRun.create({
     editor: persona.name,
     status: 'running',
@@ -28,129 +64,131 @@ async function runPipeline(persona, options = {}) {
     let booksToProcess = [];
 
     if (backfill) {
-      // Backfill mode: generate reviews for existing books without reviews
+      // Recovery mode: re-review published books that somehow lost their review
       booksToProcess = await Book.find({
         editor: persona.name,
         status: 'published',
         'review.headline': { $exists: false },
       }).limit(batchSize).lean();
 
-      logger.info(`Backfill mode: found ${booksToProcess.length} books needing reviews`);
+      logger.info(`Backfill mode: ${booksToProcess.length} books needing reviews`);
     } else {
-      // Discovery mode: find new books from the web
-      const queries = persona.searchQueries.map(q => q.replace('{year}', currentYear));
-      const discovered = await discoverBooks(queries, { batchSize, editorName: persona.name });
+      // Primary: pull from pre-queued metadata_complete books (auto-imported from scrapers)
+      booksToProcess = await Book.find({
+        editor: persona.name,
+        status: 'metadata_complete',
+      }).limit(batchSize).lean();
 
-      // Save discovered books to DB
-      for (const bookData of discovered) {
-        try {
-          const saved = await Book.create(bookData);
-          booksToProcess.push(saved.toObject());
-          run.booksDiscovered += 1;
-        } catch (err) {
-          if (err.code === 11000) {
-            run.booksSkipped += 1;
-            logger.debug(`Duplicate skipped: "${bookData.title}"`);
-          } else {
-            run.booksFailed += 1;
-            run.errors.push({ bookTitle: bookData.title, error: err.message, timestamp: new Date() });
-            logger.error(`Failed to save "${bookData.title}": ${err.message}`);
+      run.booksDiscovered = booksToProcess.length;
+      logger.info(`Queue: ${booksToProcess.length} pre-queued books for ${persona.name}`);
+
+      // Supplement with fresh web discovery if the queue is short
+      if (booksToProcess.length < batchSize) {
+        const needed = batchSize - booksToProcess.length;
+        const queries = persona.searchQueries.map(q => q.replace('{year}', currentYear));
+        const discovered = await discoverBooks(queries, { batchSize: needed, editorName: persona.name });
+
+        for (const bookData of discovered) {
+          try {
+            const saved = await Book.create(bookData);
+            booksToProcess.push(saved.toObject());
+            run.booksDiscovered += 1;
+          } catch (err) {
+            if (err.code === 11000) {
+              run.booksSkipped += 1;
+            } else {
+              run.booksFailed += 1;
+              run.errors.push({ bookTitle: bookData.title, error: err.message, timestamp: new Date() });
+              logger.error(`Failed to save "${bookData.title}": ${err.message}`);
+            }
           }
         }
+
+        logger.info(`Discovery supplemented: ${discovered.length} additional books found`);
       }
     }
 
-    // Generate reviews for each book
-    for (const book of booksToProcess) {
-      try {
-        logger.info(`Generating review: "${book.title}" by ${book.author}`);
+    // ──── Phase 1: Generate reviews (concurrent) ─────────────────────────────
+    const successfulBookIds = [];
 
-        const { review, tokensUsed } = await generateReview(book, persona);
+    for (let i = 0; i < booksToProcess.length; i += REVIEW_CONCURRENCY) {
+      const chunk = booksToProcess.slice(i, i + REVIEW_CONCURRENCY);
 
-        // Update the book with the review
-        await Book.findByIdAndUpdate(book._id, {
-          blurb: review.blurb,
-          takeaways: review.takeaways,
-          rating: review.rating,
-          review: {
-            headline: review.headline,
-            stand: review.stand,
-            paragraphs: review.paragraphs,
-            pullQuote: review.pullQuote,
-            summaryBullets: review.summaryBullets,
-          },
-          status: 'published',
-          'sources.reviewGeneratedAt': new Date(),
-        });
+      const results = await Promise.allSettled(
+        chunk.map(book => generateAndSaveReview(book, persona))
+      );
 
-        run.booksReviewed += 1;
-        run.tokensUsed += tokensUsed;
+      for (let j = 0; j < results.length; j++) {
+        const book = chunk[j];
+        const r = results[j];
 
-        // Estimate cost (using gpt-4o pricing as baseline)
-        const inputCost = (tokensUsed * 0.6) / 1000000; // rough average
-        run.estimatedCost += inputCost;
-
-        logger.info(`Review complete: "${book.title}" — Rating: ${review.rating}`);
-      } catch (err) {
-        run.booksFailed += 1;
-        run.errors.push({ bookTitle: book.title, error: err.message, timestamp: new Date() });
-        logger.error(`Review generation failed for "${book.title}": ${err.message}`);
-
-        // Mark book as failed
-        await Book.findByIdAndUpdate(book._id, {
-          status: 'failed',
-          errorLog: err.message,
-        });
+        if (r.status === 'fulfilled') {
+          successfulBookIds.push(book._id);
+          run.booksReviewed += 1;
+          run.tokensUsed += r.value.tokensUsed;
+          run.estimatedCost += (r.value.tokensUsed * 0.6) / 1000000;
+          logger.info(`Review complete: "${book.title}"`);
+        } else {
+          run.booksFailed += 1;
+          run.errors.push({ bookTitle: book.title, error: r.reason?.message || 'Unknown error', timestamp: new Date() });
+          await Book.findByIdAndUpdate(book._id, { status: 'failed', errorLog: r.reason?.message });
+          logger.error(`Review failed for "${book.title}": ${r.reason?.message}`);
+        }
       }
+
+      // Persist progress after every chunk so admin dashboard stays live
+      await run.save();
     }
 
-    // ──── Phase 2: Generate chapter summaries for reviewed books ────
-    const reviewedBookIds = booksToProcess
-      .filter((_, i) => !run.errors.some(e => e.bookTitle === booksToProcess[i]?.title))
-      .map(b => b._id);
-
+    // ──── Phase 2: Chapter summaries (concurrent) ────────────────────────────
     const reviewedBooks = await Book.find({
-      _id: { $in: reviewedBookIds },
+      _id: { $in: successfulBookIds },
       status: 'published',
-      'review.headline': { $exists: true },
     }).lean();
 
-    for (const book of reviewedBooks) {
-      try {
-        logger.info(`Generating chapter summaries: "${book.title}" by ${book.author}`);
+    for (let i = 0; i < reviewedBooks.length; i += CHAPTER_CONCURRENCY) {
+      const chunk = reviewedBooks.slice(i, i + CHAPTER_CONCURRENCY);
 
-        const { chapterSummaries, tokensUsed } = await generateChapterSummary(book, persona);
+      const results = await Promise.allSettled(
+        chunk.map(book => generateAndSaveChapters(book, persona))
+      );
 
-        await Book.findByIdAndUpdate(book._id, {
-          chapterSummaries,
-          'sources.chapterSummariesGeneratedAt': new Date(),
-        });
+      for (let j = 0; j < results.length; j++) {
+        const book = chunk[j];
+        const r = results[j];
 
-        run.chaptersGenerated = (run.chaptersGenerated || 0) + 1;
-        run.tokensUsed += tokensUsed;
-
-        const inputCost = (tokensUsed * 0.6) / 1000000;
-        run.estimatedCost += inputCost;
-
-        logger.info(`Chapter summaries complete: "${book.title}" — ${chapterSummaries.length} chapters`);
-      } catch (err) {
-        // Chapter summary failures are non-fatal — book already has its review
-        run.errors.push({
-          bookTitle: book.title,
-          error: `Chapter summaries failed: ${err.message}`,
-          timestamp: new Date(),
-        });
-        logger.warn(`Chapter summary generation failed for "${book.title}": ${err.message}`);
+        if (r.status === 'fulfilled') {
+          run.chaptersGenerated = (run.chaptersGenerated || 0) + 1;
+          run.tokensUsed += r.value.tokensUsed;
+          run.estimatedCost += (r.value.tokensUsed * 0.6) / 1000000;
+          logger.info(`Chapters complete: "${book.title}"`);
+        } else {
+          // Chapter failure is non-fatal — the review is already published
+          run.errors.push({
+            bookTitle: book.title,
+            error: `Chapters failed: ${r.reason?.message}`,
+            timestamp: new Date(),
+          });
+          logger.warn(`Chapter generation failed for "${book.title}": ${r.reason?.message}`);
+        }
       }
+
+      await run.save();
     }
 
-    // Complete the run
-    run.status = run.booksFailed > 0 && run.booksReviewed > 0 ? 'partial' : run.booksFailed > 0 ? 'failed' : 'completed';
+    // ──── Finalize run ────────────────────────────────────────────────────────
+    run.status = run.booksFailed > 0 && run.booksReviewed > 0 ? 'partial'
+               : run.booksFailed > 0 ? 'failed'
+               : 'completed';
     run.completedAt = new Date();
     run.durationMs = Date.now() - run.startedAt.getTime();
     await run.save();
 
-    logger.info(`Agent run completed: ${persona.name} — Discovered: ${run.booksDiscovered}, Reviewed: ${run.booksReviewed}, Failed: ${run.booksFailed}, Skipped: ${run.booksSkipped}`);
+    logger.info(
+      `Agent run complete: ${persona.name} — ` +
+      `Discovered: ${run.booksDiscovered}, Reviewed: ${run.booksReviewed}, ` +
+      `Chapters: ${run.chaptersGenerated || 0}, Failed: ${run.booksFailed}`
+    );
 
     return run._id.toString();
   } catch (err) {
