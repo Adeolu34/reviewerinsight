@@ -9,6 +9,9 @@ const NYT_LISTS = [
   'hardcover-nonfiction',
   'paperback-nonfiction',
   'young-adult-hardcover',
+  'business-books',                      // Psychology of Money, etc.
+  'advice-how-to-and-miscellaneous',     // Atomic Habits, self-help, etc.
+  'combined-print-and-e-book-nonfiction', // Broad nonfiction catch-all
 ];
 
 const LIST_GENRE_MAP = {
@@ -16,6 +19,9 @@ const LIST_GENRE_MAP = {
   'hardcover-nonfiction': 'Essays',
   'paperback-nonfiction': 'Essays',
   'young-adult-hardcover': 'Fiction',
+  'business-books': 'Business',
+  'advice-how-to-and-miscellaneous': 'Essays',
+  'combined-print-and-e-book-nonfiction': 'Essays',
 };
 
 class NytBestsellersScraper extends BaseScraper {
@@ -41,7 +47,7 @@ class NytBestsellersScraper extends BaseScraper {
             headers: { 'User-Agent': 'ReviewerInsight/1.0 (book-review-aggregator)' },
             signal: AbortSignal.timeout(15000),
           });
-          if (!res.ok) throw new Error(`NYT API ${res.status} for ${list}`);
+          if (!res.ok) { const e = new Error(`NYT API ${res.status} for ${list}`); e.status = res.status; throw e; }
           return res.json();
         }, { label: `NYT: ${list}` });
 

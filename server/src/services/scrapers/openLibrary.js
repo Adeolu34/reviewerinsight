@@ -4,8 +4,10 @@ const { withRetry } = require('../../utils/retry');
 const logger = require('../../utils/logger');
 
 const OL_ENDPOINTS = [
-  'https://openlibrary.org/trending/daily.json',
   'https://openlibrary.org/trending/now.json',
+  'https://openlibrary.org/trending/daily.json',
+  'https://openlibrary.org/trending/weekly.json',
+  'https://openlibrary.org/trending/yearly.json', // surfaces sustained popular books
 ];
 
 class OpenLibraryScraper extends BaseScraper {
@@ -24,7 +26,7 @@ class OpenLibraryScraper extends BaseScraper {
             headers: { 'User-Agent': 'ReviewerInsight/1.0 (book-review-aggregator)' },
             signal: AbortSignal.timeout(15000),
           });
-          if (!res.ok) throw new Error(`OL fetch failed: ${res.status}`);
+          if (!res.ok) { const e = new Error(`OL fetch failed: ${res.status}`); e.status = res.status; throw e; }
           return res.json();
         }, { label: `OL: ${url}` });
 

@@ -5,12 +5,18 @@ const { withRetry } = require('../../utils/retry');
 const logger = require('../../utils/logger');
 
 const SUBJECTS = [
+  // New releases — ordered by recency
   { query: 'subject:fiction', genre: 'Fiction' },
   { query: 'subject:nonfiction', genre: 'Essays' },
   { query: 'subject:biography', genre: 'Memoir' },
   { query: 'subject:science+fiction', genre: 'Sci-Fi' },
   { query: 'subject:history', genre: 'History' },
   { query: 'subject:business', genre: 'Business' },
+  // Popular/evergreen — ordered by relevance to surface high-engagement books
+  // (e.g. Atomic Habits, Psychology of Money, Thinking Fast and Slow)
+  { query: 'subject:self-help', genre: 'Essays', orderBy: 'relevance' },
+  { query: 'subject:psychology', genre: 'Essays', orderBy: 'relevance' },
+  { query: 'subject:personal+finance', genre: 'Business', orderBy: 'relevance' },
 ];
 
 class GoogleBooksTrendingScraper extends BaseScraper {
@@ -21,11 +27,11 @@ class GoogleBooksTrendingScraper extends BaseScraper {
   async fetchBooks() {
     const books = [];
 
-    for (const { query, genre } of SUBJECTS) {
+    for (const { query, genre, orderBy = 'newest' } of SUBJECTS) {
       try {
         await googleBooksLimiter.acquire();
 
-        let url = `https://www.googleapis.com/books/v1/volumes?q=${query}&orderBy=newest&maxResults=20&printType=books&langRestrict=en`;
+        let url = `https://www.googleapis.com/books/v1/volumes?q=${query}&orderBy=${orderBy}&maxResults=20&printType=books&langRestrict=en`;
         if (config.googleBooksKey) url += `&key=${config.googleBooksKey}`;
 
         const data = await withRetry(async () => {
@@ -33,7 +39,7 @@ class GoogleBooksTrendingScraper extends BaseScraper {
             headers: { 'User-Agent': 'ReviewerInsight/1.0 (book-review-aggregator)' },
             signal: AbortSignal.timeout(15000),
           });
-          if (!res.ok) throw new Error(`Google Books API ${res.status}`);
+          if (!res.ok) { const e = new Error(`Google Books API ${res.status}`); e.status = res.status; throw e; }
           return res.json();
         }, { label: `GoogleBooks: ${query}` });
 

@@ -38,7 +38,7 @@ class AppleBooksTopScraper extends BaseScraper {
             headers: { 'User-Agent': 'ReviewerInsight/1.0 (book-review-aggregator)' },
             signal: AbortSignal.timeout(15000),
           });
-          if (!res.ok) throw new Error(`Apple Books feed ${res.status}`);
+          if (!res.ok) { const e = new Error(`Apple Books feed ${res.status}`); e.status = res.status; throw e; }
           return res.json();
         }, { label: `AppleBooks: ${feedUrl.includes('top-paid') ? 'top-paid' : 'top-free'}` });
 

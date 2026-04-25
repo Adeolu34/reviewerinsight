@@ -41,8 +41,12 @@ async function isDuplicate(title, author, isbn) {
   const norm = normalize(title, author);
   if (!norm.title || !norm.author) return { isDup: false };
 
+  // Match stored titles both with and without a leading article (the/a/an),
+  // since normalize() strips them but stored titles retain the original form.
+  const titleRegex = new RegExp(`^(?:(?:the|a|an)\\s+)?${escapeRegex(norm.title)}`, 'i');
+
   const byTitle = await Book.findOne({
-    title: { $regex: new RegExp(`^${escapeRegex(norm.title)}`, 'i') },
+    title: { $regex: titleRegex },
     author: { $regex: new RegExp(escapeRegex(norm.author), 'i') },
   }).select('_id title').lean();
 

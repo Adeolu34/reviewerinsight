@@ -12,8 +12,10 @@ async function withRetry(fn, options = {}) {
     } catch (error) {
       if (attempt === maxAttempts) throw error;
 
-      // Don't retry on 4xx client errors (except 429 rate limit)
-      if (error.status && error.status >= 400 && error.status < 500 && error.status !== 429) {
+      // Don't retry on 4xx client errors (except 429 rate limit).
+      // Scrapers attach err.status when throwing; fall back to parsing the message.
+      const httpStatus = error.status || parseInt((error.message || '').match(/\b([45]\d{2})\b/)?.[1]);
+      if (httpStatus && httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429) {
         throw error;
       }
 
