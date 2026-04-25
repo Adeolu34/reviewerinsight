@@ -73,15 +73,19 @@ const PAGES_PER_SUBJECT = 5;
 const RESULTS_PER_PAGE = 100;
 
 class OpenLibraryBulkScraper extends BaseScraper {
-  constructor() {
+  constructor({ maxBooks = 25000 } = {}) {
     super('openlibraryBulk');
+    this.maxBooks = maxBooks;
   }
 
   async fetchBooks() {
     const books = [];
 
     for (const { term, genre } of SUBJECTS) {
+      if (books.length >= this.maxBooks) break;
+
       for (let page = 0; page < PAGES_PER_SUBJECT; page++) {
+        if (books.length >= this.maxBooks) break;
         try {
           await openLibraryLimiter.acquire();
 
