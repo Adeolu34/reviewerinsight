@@ -191,13 +191,19 @@ const Marquee = ({ items, accent }) => (
 
 const amazonAffiliateUrl = (book) => {
   const tag = 'reviewerin0d8-20';
-  const isbn = book.isbn ? book.isbn.replace(/-/g, '') : null;
-  if (isbn) {
-    return isbn.length === 10
-      ? `https://www.amazon.com/dp/${isbn}?tag=${tag}`
-      : `https://www.amazon.com/s?k=${encodeURIComponent(isbn)}&tag=${tag}`;
+  // Strip everything except digits and X (handles dashes, spaces, mixed formats)
+  const isbn = book.isbn ? book.isbn.replace(/[^0-9Xx]/g, '') : null;
+
+  if (isbn && isbn.length >= 10) {
+    // Search by ISBN — precise, handles both ISBN-10 and ISBN-13, avoids dead dp/ links
+    return `https://www.amazon.com/s?k=${encodeURIComponent(isbn)}&i=stripbooks&tag=${tag}`;
   }
-  return `https://www.amazon.com/s?k=${encodeURIComponent(`${book.title} ${book.author}`)}&tag=${tag}`;
+
+  // Quote the title so Amazon doesn't match unrelated books with similar words
+  const title = (book.title || '').trim();
+  const author = (book.author || '').trim();
+  const query = author ? `"${title}" ${author}` : `"${title}"`;
+  return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&i=stripbooks&tag=${tag}`;
 };
 
 Object.assign(window, { Stars, Eyebrow, Rule, GenreTag, Seal, Header, Marquee, useReveal, amazonAffiliateUrl });
