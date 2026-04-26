@@ -20,6 +20,7 @@ const scraperRouter = require('./routes/scraper');
 const recommendationsRouter = require('./routes/recommendations');
 const trendingRouter = require('./routes/trending');
 const sitemapRouter = require('./routes/sitemap');
+const feedRouter = require('./routes/feed');
 const seoMiddleware = require('./middleware/seoMiddleware');
 
 async function startServer() {
@@ -56,8 +57,9 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Sitemap (before catch-all)
+  // Sitemap + RSS feed (before catch-all)
   app.use(sitemapRouter);
+  app.use(feedRouter);
 
   // Fallback: serve the frontend with SEO meta injection for non-API routes
   app.get('*', (req, res, next) => {
