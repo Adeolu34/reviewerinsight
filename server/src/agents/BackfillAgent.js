@@ -3,13 +3,18 @@ const Book = require('../models/Book');
 const AgentRun = require('../models/AgentRun');
 const { generateReview, generateChapterSummary } = require('../services/openaiReview');
 const EditorAgent = require('./EditorAgent');
+const config = require('../config/env');
 const logger = require('../utils/logger');
 
-const REVIEW_CONCURRENCY = 5;
-const CHAPTER_CONCURRENCY = 3;
-const REVIEW_BATCH = 200;
-const CHAPTER_BATCH = 100;
+const REVIEW_CONCURRENCY = 3;
+const CHAPTER_CONCURRENCY = 2;
+const REVIEW_BATCH = 25;   // per run — paced to protect daily budget
+const CHAPTER_BATCH = 10;  // per run
 const DEFAULT_PERSONA = 'Mira Okafor';
+
+// Only retry failed books that have been in failed state for at least this long.
+// Prevents burning tokens on books that fail every single tick.
+const FAILED_RETRY_AFTER_HOURS = 6;
 
 class BackfillAgent {
   constructor() {
@@ -18,18 +23,17 @@ class BackfillAgent {
   }
 
   /**
-   * Start the continuous backfill schedule.
-   * Runs every 20 minutes. Also fires once 15s after server startup so
-   * any backlog from a restart is picked up immediately.
+   * Start the backfill schedule — runs once per hour.
+   * Also fires once 15s after server startup to catch immediate backlog.
    */
   startSchedule() {
-    this.job = cron.schedule('*/20 * * * *', async () => {
+    this.job = cron.schedule('0 * * * *', async () => {
       await this.run();
     }, { timezone: 'UTC' });
 
     setTimeout(() => this.run(), 15000);
 
-    logger.info('BackfillAgent started — every 20 minutes (covers all incomplete books)');
+    logger.info(`BackfillAgent started — hourly, ${REVIEW_BATCH} reviews + ${CHAPTER_BATCH} chapters per tick`);
   }
 
   async run() {
@@ -38,21 +42,28 @@ class BackfillAgent {
       return;
     }
 
+    // ── Budget gate: skip if today's spend is ≥90% of the daily limit ───────
+    const { overBudget, todayCost, budget } = await this._todaySpend();
+    if (overBudget) {
+      logger.warn(`BackfillAgent: daily budget nearly exhausted ($${todayCost.toFixed(2)} / $${budget}) — skipping tick`);
+      return;
+    }
+
     this.running = true;
     const run = await AgentRun.create({ editor: 'Backfill', status: 'running' });
 
     try {
-      // ── Phase 1: Reset failed books so they re-enter the queue ──────────────
-      const failedCount = await Book.countDocuments({ status: 'failed' });
-      if (failedCount > 0) {
-        await Book.updateMany(
-          { status: 'failed' },
-          { $set: { status: 'metadata_complete', errorLog: '' } }
-        );
-        logger.info(`BackfillAgent: reset ${failedCount} failed books → metadata_complete`);
+      // ── Phase 1: Reset failed books — but only ones stuck for 6+ hours ──────
+      const retryThreshold = new Date(Date.now() - FAILED_RETRY_AFTER_HOURS * 60 * 60 * 1000);
+      const resetResult = await Book.updateMany(
+        { status: 'failed', updatedAt: { $lte: retryThreshold } },
+        { $set: { status: 'metadata_complete', errorLog: '' } }
+      );
+      if (resetResult.modifiedCount > 0) {
+        logger.info(`BackfillAgent: reset ${resetResult.modifiedCount} failed books → metadata_complete (failed 6h+ ago)`);
       }
 
-      // ── Phase 2: Generate missing reviews ───────────────────────────────────
+      // ── Phase 2: Generate missing reviews ────────────────────────────────────
       const needsReview = await Book.find({
         $or: [
           { status: 'metadata_complete' },
@@ -70,7 +81,7 @@ class BackfillAgent {
         await run.save();
       }
 
-      // ── Phase 3: Generate missing chapter summaries ──────────────────────────
+      // ── Phase 3: Generate missing chapter summaries ───────────────────────────
       const needsChapters = await Book.find({
         status: 'published',
         'review.headline': { $exists: true },
@@ -95,7 +106,8 @@ class BackfillAgent {
       } else {
         logger.info(
           `BackfillAgent: run complete — reviews: ${run.booksReviewed}, ` +
-          `chapters: ${run.chaptersGenerated || 0}, failed: ${run.booksFailed}`
+          `chapters: ${run.chaptersGenerated || 0}, failed: ${run.booksFailed}, ` +
+          `cost: $${run.estimatedCost.toFixed(4)}`
         );
       }
 
@@ -112,6 +124,15 @@ class BackfillAgent {
       await run.save();
       this.running = false;
     }
+  }
+
+  async _todaySpend() {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const runs = await AgentRun.find({ startedAt: { $gte: todayStart } }).select('estimatedCost').lean();
+    const todayCost = runs.reduce((sum, r) => sum + (r.estimatedCost || 0), 0);
+    const budget = config.openaiDailyBudget;
+    return { overBudget: todayCost >= budget * 0.9, todayCost, budget };
   }
 
   async _runReviews(books, run) {
@@ -160,7 +181,6 @@ class BackfillAgent {
           tokens += r.value;
           logger.info(`BackfillAgent: chapters done — "${book.title}"`);
         } else {
-          // Chapter failures are non-fatal — the review is already published
           const msg = r.reason?.message || 'Unknown error';
           run.errors.push({ bookTitle: book.title, error: `chapters: ${msg}`, timestamp: new Date() });
           logger.warn(`BackfillAgent: chapters failed — "${book.title}": ${msg}`);

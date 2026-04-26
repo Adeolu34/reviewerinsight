@@ -22,7 +22,7 @@ async function generateReview(book, persona) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.8,
-      max_tokens: 3000,
+      max_tokens: 1800,
     });
   }, { label: `OpenAI review: "${book.title}"`, maxAttempts: 2 });
 
@@ -139,7 +139,7 @@ async function generateChapterSummary(book, persona) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.7,
-      max_tokens: 3000,
+      max_tokens: 1200,
     });
   }, { label: `OpenAI chapters: "${book.title}"`, maxAttempts: 2 });
 

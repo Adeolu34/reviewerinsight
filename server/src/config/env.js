@@ -13,7 +13,7 @@ module.exports = {
   mongoUri: process.env.MONGODB_URI,
   openaiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
-  openaiDailyBudget: parseFloat(process.env.OPENAI_DAILY_BUDGET_USD) || 10.0,
+  openaiDailyBudget: parseFloat(process.env.OPENAI_DAILY_BUDGET_USD) || 3.0,
   googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY,
   nytApiKey: process.env.NYT_BOOKS_API_KEY,
   adminApiKey: process.env.ADMIN_API_KEY,
