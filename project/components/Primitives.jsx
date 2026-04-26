@@ -1,18 +1,15 @@
 // Shared small bits: Star, Eyebrow, Rule, GenreTag, Seal + scroll-reveal hook
-const { useEffect, useRef, useState, useCallback } = React;
+const { useState, useCallback } = React;
 
 // Scroll-triggered reveal hook
 const useReveal = (options = {}) => {
-  const ref = useRef(null);
   const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
+  const ref = useCallback(el => {
     if (!el) return;
     const obs = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) { setVisible(true); obs.unobserve(el); }
     }, { threshold: options.threshold || 0.12, rootMargin: options.rootMargin || '0px 0px -40px 0px' });
     obs.observe(el);
-    return () => obs.disconnect();
   }, []);
   return [ref, visible];
 };

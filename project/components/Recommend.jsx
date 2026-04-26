@@ -62,7 +62,7 @@ const WelcomeStep = ({ onBegin, accent }) => {
   return (
     <div ref={ref} style={{ textAlign: 'center', padding: '80px 0 40px' }}>
       <div style={{ opacity: vis ? 1 : 0, transform: vis ? 'translateY(0)' : 'translateY(24px)', transition: 'all .6s cubic-bezier(.2,.8,.2,1)' }}>
-        <Eyebrow color={accent}>Recommendation Engine — Powered by AI</Eyebrow>
+        <Eyebrow color={accent}>For You — Recommendation Engine</Eyebrow>
       </div>
       <h1 style={{
         font: '900 120px "DM Serif Display", Georgia, serif', margin: '12px 0 24px', letterSpacing: '-.03em', lineHeight: .85,
@@ -75,7 +75,7 @@ const WelcomeStep = ({ onBegin, accent }) => {
         font: '400 20px/1.55 "Space Grotesk", sans-serif', maxWidth: 560, margin: '0 auto 36px', color: '#141210',
         opacity: vis ? 1 : 0, transition: 'opacity .6s .3s ease',
       }}>
-        Answer five quick questions. Our AI will search the Reviewer Insight catalog and hand-pick books matched to your taste, age, and mood.
+        Answer five quick questions. We'll score the full catalog against your mood, taste, and pace — and surface books you're actually likely to read.
       </p>
       <button onClick={onBegin} className="ri-btn-primary" style={{
         font: '700 14px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em',
@@ -403,7 +403,7 @@ const ResultsDisplay = ({ data, onRestart, setRoute, accent }) => {
       {/* Meta */}
       {meta && (
         <div style={{ textAlign: 'center', marginTop: 24, font: '400 11px "JetBrains Mono", monospace', opacity: .35, textTransform: 'uppercase', letterSpacing: '.14em' }}>
-          Searched {meta.candidateCount} books · {meta.modelUsed}
+          Scored {meta.candidateCount} books · {meta.algorithm || 'score-v2'}{meta.modelUsed && meta.modelUsed !== 'algorithmic' ? ` · ${meta.modelUsed}` : ''}
         </div>
       )}
     </div>
