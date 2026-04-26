@@ -189,4 +189,15 @@ const Marquee = ({ items, accent }) => (
   </div>
 );
 
-Object.assign(window, { Stars, Eyebrow, Rule, GenreTag, Seal, Header, Marquee, useReveal });
+const amazonAffiliateUrl = (book) => {
+  const tag = 'reviewerin0d8-20';
+  const isbn = book.isbn ? book.isbn.replace(/-/g, '') : null;
+  if (isbn) {
+    return isbn.length === 10
+      ? `https://www.amazon.com/dp/${isbn}?tag=${tag}`
+      : `https://www.amazon.com/s?k=${encodeURIComponent(isbn)}&tag=${tag}`;
+  }
+  return `https://www.amazon.com/s?k=${encodeURIComponent(`${book.title} ${book.author}`)}&tag=${tag}`;
+};
+
+Object.assign(window, { Stars, Eyebrow, Rule, GenreTag, Seal, Header, Marquee, useReveal, amazonAffiliateUrl });

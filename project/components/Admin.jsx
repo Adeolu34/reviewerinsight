@@ -54,9 +54,20 @@ const Card = ({ title, actions, children, style }) => (
   </div>
 );
 
-const Metric = ({ label, value, sub, color }) => (
-  <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 16px', textAlign: 'center' }}>
-    <div style={{ fontSize: 11, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.1em', color: T.muted, marginBottom: 6 }}>{label}</div>
+const Metric = ({ label, value, sub, color, onClick }) => (
+  <div
+    onClick={onClick}
+    style={{
+      background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 16px', textAlign: 'center',
+      cursor: onClick ? 'pointer' : 'default',
+      transition: onClick ? 'border-color .15s, box-shadow .15s' : undefined,
+    }}
+    onMouseEnter={onClick ? e => { e.currentTarget.style.borderColor = T.accent; e.currentTarget.style.boxShadow = `0 0 0 2px ${T.accent}30`; } : undefined}
+    onMouseLeave={onClick ? e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = 'none'; } : undefined}
+  >
+    <div style={{ fontSize: 11, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.1em', color: T.muted, marginBottom: 6 }}>
+      {label}{onClick && <span style={{ marginLeft: 4, opacity: .5 }}>↗</span>}
+    </div>
     <div style={{ fontSize: 28, fontWeight: 800, fontFamily: T.serif, color: color || T.text, lineHeight: 1 }}>{value}</div>
     {sub && <div style={{ fontSize: 11, fontFamily: T.mono, color: T.dim, marginTop: 6 }}>{sub}</div>}
   </div>
@@ -162,7 +173,7 @@ function useAdminApi(fetchFn, deps = []) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SECTION: Overview
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const OverviewSection = () => {
+const OverviewSection = ({ navigate }) => {
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getOverview());
 
   if (loading) return <div style={{ color: T.muted, fontFamily: T.mono, padding: 40, textAlign: 'center' }}>Loading dashboard...</div>;
@@ -170,15 +181,16 @@ const OverviewSection = () => {
 
   const { metrics: m, agentStatus: a, costSummary: c, recentErrors, statusBreakdown } = data;
   const maxStatus = Math.max(...Object.values(statusBreakdown), 1);
+  const goBooks = (status) => navigate && navigate('books', { status });
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       {/* Key metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-        <Metric label="Total Books" value={fmtNum(m.totalBooks)} sub={`+${m.todayDiscovered} today`} />
-        <Metric label="Published" value={fmtNum(m.publishedBooks)} color={T.ok} />
-        <Metric label="Pending Review" value={m.pendingReviews} color={T.warn} />
-        <Metric label="Failed" value={m.failedBooks} color={m.failedBooks > 0 ? T.err : T.text} />
+        <Metric label="Total Books" value={fmtNum(m.totalBooks)} sub={`+${m.todayDiscovered} today`} onClick={() => goBooks('')} />
+        <Metric label="Published" value={fmtNum(m.publishedBooks)} color={T.ok} onClick={() => goBooks('published')} />
+        <Metric label="Pending Review" value={m.pendingReviews} color={T.warn} onClick={() => goBooks('metadata_complete')} />
+        <Metric label="Failed" value={m.failedBooks} color={m.failedBooks > 0 ? T.err : T.text} onClick={() => goBooks('failed')} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -241,12 +253,19 @@ const OverviewSection = () => {
       <Card title="Book Status Breakdown">
         <div style={{ display: 'grid', gap: 10 }}>
           {Object.entries(statusBreakdown).map(([status, count]) => (
-            <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 120, fontSize: 12, fontFamily: T.mono, color: T.muted, textTransform: 'capitalize' }}>{status.replace('_', ' ')}</div>
+            <div
+              key={status}
+              onClick={() => goBooks(status)}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', borderRadius: 6, padding: '4px 6px', margin: '-4px -6px', transition: 'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = T.hover}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ width: 120, fontSize: 12, fontFamily: T.mono, color: T.muted, textTransform: 'capitalize' }}>{status.replace(/_/g, ' ')}</div>
               <div style={{ flex: 1, height: 22, background: T.hover, borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
                 <div style={{ height: '100%', width: `${(count / maxStatus) * 100}%`, background: STATUS_COLORS[status] || T.accent, borderRadius: 4, transition: 'width .4s ease' }} />
               </div>
               <div style={{ width: 50, fontSize: 13, fontFamily: T.mono, fontWeight: 700, color: T.text, textAlign: 'right' }}>{count}</div>
+              <div style={{ fontSize: 10, fontFamily: T.mono, color: T.dim, width: 14 }}>↗</div>
             </div>
           ))}
         </div>
@@ -281,7 +300,20 @@ const OverviewSection = () => {
 const RunsSection = () => {
   const [filters, setFilters] = useState({ editor: '', status: '', page: 1 });
   const [modal, setModal] = useState(null); // 'trigger' or run object
+  const [backfillMsg, setBackfillMsg] = useState('');
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getRuns(filters), [filters]);
+
+  const triggerBackfill = async () => {
+    setBackfillMsg('Starting…');
+    try {
+      await AdminClient.triggerBackfill();
+      setBackfillMsg('Backfill started — check table for progress');
+      setTimeout(() => { setBackfillMsg(''); refresh(); }, 3000);
+    } catch (e) {
+      setBackfillMsg(e.message === 'Backfill already running' ? 'Already running' : `Error: ${e.message}`);
+      setTimeout(() => setBackfillMsg(''), 4000);
+    }
+  };
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
@@ -290,12 +322,15 @@ const RunsSection = () => {
         <Select value={filters.editor} onChange={v => setFilters({ ...filters, editor: v, page: 1 })}>
           <option value="">All Editors</option>
           <option>Mira Okafor</option><option>Jules Park</option><option>Dae Han</option><option>Noor Saleh</option>
+          <option>Backfill</option>
         </Select>
         <Select value={filters.status} onChange={v => setFilters({ ...filters, status: v, page: 1 })}>
           <option value="">All Statuses</option>
           <option>running</option><option>completed</option><option>failed</option><option>partial</option>
         </Select>
         <div style={{ flex: 1 }} />
+        {backfillMsg && <span style={{ fontFamily: T.mono, fontSize: 11, color: T.muted }}>{backfillMsg}</span>}
+        <Btn variant="ghost" onClick={triggerBackfill}>⚡ Run Backfill Now</Btn>
         <Btn onClick={() => setModal('trigger')}>+ Trigger Run</Btn>
         <Btn variant="ghost" onClick={refresh}>Refresh</Btn>
       </div>
@@ -407,8 +442,8 @@ const TriggerModal = ({ onClose, onDone }) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SECTION: Books
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const BooksSection = () => {
-  const [filters, setFilters] = useState({ status: '', genre: '', editor: '', search: '', page: 1 });
+const BooksSection = ({ params = {} }) => {
+  const [filters, setFilters] = useState({ status: params.status || '', genre: params.genre || '', editor: params.editor || '', search: '', page: 1 });
   const [modal, setModal] = useState(null); // { type, book }
   const [searchInput, setSearchInput] = useState('');
   const debounceRef = useRef(null);
@@ -1486,12 +1521,12 @@ const SECTIONS = [
 const Admin = ({ setRoute }) => {
   const [authed, setAuthed] = useState(!!AdminClient.getToken());
   const [section, setSection] = useState('overview');
+  const [sectionParams, setSectionParams] = useState({});
 
-  // If auth expired mid-session
-  useEffect(() => {
-    const orig = window.fetch;
-    // No need to intercept — AdminClient handles 401 → AUTH_EXPIRED
-  }, []);
+  const navigate = (sec, params = {}) => {
+    setSectionParams(params);
+    setSection(sec);
+  };
 
   if (!authed) return <AdminLogin onAuth={() => setAuthed(true)} />;
 
@@ -1522,7 +1557,7 @@ const Admin = ({ setRoute }) => {
 
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
           {SECTIONS.map(s => (
-            <button key={s.id} onClick={() => setSection(s.id)} style={{
+            <button key={s.id} onClick={() => navigate(s.id)} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: T.sans, fontWeight: 500,
               background: section === s.id ? `${T.accent}20` : 'transparent',
               color: section === s.id ? T.accentHover : T.muted,
@@ -1547,7 +1582,7 @@ const Admin = ({ setRoute }) => {
               {SECTIONS.find(s => s.id === section)?.label}
             </h1>
           </div>
-          <SectionComponent />
+          <SectionComponent navigate={navigate} params={sectionParams} />
         </div>
       </div>
     </div>

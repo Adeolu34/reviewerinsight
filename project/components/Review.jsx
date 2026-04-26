@@ -132,6 +132,11 @@ const Review = ({ bookId, initialTab, setRoute, accent, density }) => {
                 padding:'12px 18px', border:'1.5px solid #141210', cursor:'pointer', borderRadius: 999,
                 background: saved ? '#141210' : 'transparent', color: saved ? '#F5EFE4' : '#141210'
               }}>{saved ? '✓ Saved to shelf' : '+ Save to shelf'}</button>
+              <a href={amazonAffiliateUrl(book)} target="_blank" rel="noopener noreferrer" style={{
+                font:'700 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
+                padding:'12px 18px', border:'1.5px solid #141210', cursor:'pointer', borderRadius: 999,
+                background: accent, color:'#F5EFE4', textDecoration:'none', display:'inline-block'
+              }}>Buy on Amazon →</a>
               <button className="ri-btn-ghost" style={{
                 font:'700 12px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
                 padding:'12px 18px', border:'1.5px solid #141210', cursor:'pointer', borderRadius: 999, background:'transparent'

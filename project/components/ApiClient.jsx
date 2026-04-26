@@ -212,6 +212,9 @@ const AdminClient = {
   triggerAgent(editor, batchSize = 10) {
     return this._fetch('/trigger-agent', { method: 'POST', body: JSON.stringify({ editor, batchSize }) });
   },
+  triggerBackfill() {
+    return this._fetch('/trigger-backfill', { method: 'POST' });
+  },
   retryBook(id, step = 'review') {
     return this._fetch(`/books/${id}/retry`, { method: 'POST', body: JSON.stringify({ step }) });
   },

@@ -7,6 +7,7 @@ const securityHeaders = require('./middleware/securityHeaders');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const AgentOrchestrator = require('./agents/AgentOrchestrator');
+const BackfillAgent = require('./agents/BackfillAgent');
 
 // Route imports
 const booksRouter = require('./routes/books');
@@ -76,6 +77,12 @@ async function startServer() {
   // Start scheduled agent runs (only if API keys are configured)
   if (config.openaiKey && config.openaiKey !== 'sk-your-openai-key-here') {
     orchestrator.startSchedule();
+
+    // Continuous backfill: catches all books stuck in incomplete states
+    // (metadata_complete, failed, published-no-chapters) every 20 minutes
+    const backfillAgent = new BackfillAgent();
+    app.set('backfillAgent', backfillAgent);
+    backfillAgent.startSchedule();
   } else {
     logger.warn('OpenAI API key not configured — agent scheduling disabled');
   }

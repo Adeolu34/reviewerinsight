@@ -319,13 +319,11 @@ const ExternalBookCard = ({ book, index, accent }) => (
     <div style={{ font: '600 11px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', opacity: .65, marginBottom: 8 }}>{book.author}</div>
     {book.rating && <div style={{ marginBottom: 10 }}><Stars value={book.rating} size={11} /></div>}
     {book.description && <p style={{ font: '400 13px/1.45 "Space Grotesk", sans-serif', margin: '0 0 14px', opacity: .8, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{book.description}</p>}
-    {book.buyLink && (
-      <a href={book.buyLink} target="_blank" rel="noopener noreferrer" style={{
-        display: 'inline-block', font: '700 10px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em',
-        padding: '8px 14px', border: `1.5px solid ${accent}`, color: accent, borderRadius: 999, textDecoration: 'none',
-        transition: 'all .2s ease',
-      }} className="ri-btn-ghost">View Book →</a>
-    )}
+    <a href={amazonAffiliateUrl(book)} target="_blank" rel="noopener noreferrer" style={{
+      display: 'inline-block', font: '700 10px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em',
+      padding: '8px 14px', border: `1.5px solid ${accent}`, color: accent, borderRadius: 999, textDecoration: 'none',
+      transition: 'all .2s ease',
+    }} className="ri-btn-ghost">Buy on Amazon →</a>
   </div>
 );
 

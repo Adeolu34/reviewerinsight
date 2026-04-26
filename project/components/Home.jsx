@@ -191,7 +191,7 @@ const Home = ({ setRoute, accent, density }) => {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 28, rowGap: 36 }}>
             {trending.slice(0, 8).map((b, idx) => (
-              <a key={`${b.title}-${idx}`} href={b.buyLink || '#'} target={b.buyLink ? '_blank' : undefined} rel="noopener noreferrer" style={{
+              <a key={`${b.title}-${idx}`} href={amazonAffiliateUrl(b)} target="_blank" rel="noopener noreferrer" style={{
                 textDecoration:'none', color:'#141210', cursor:'pointer',
                 opacity: trendVis ? 1 : 0,
                 transform: trendVis ? 'translateY(0)' : 'translateY(28px)',

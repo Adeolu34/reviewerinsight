@@ -82,6 +82,24 @@ router.post('/trigger-agent', async (req, res, next) => {
   }
 });
 
+// ─── POST /api/admin/trigger-backfill ───────────────────────────
+router.post('/trigger-backfill', async (req, res, next) => {
+  try {
+    const backfillAgent = req.app.get('backfillAgent');
+    if (!backfillAgent) {
+      return res.status(503).json({ error: 'Backfill agent not initialized' });
+    }
+    if (backfillAgent.running) {
+      return res.status(409).json({ error: 'Backfill already running' });
+    }
+    // Fire and don't await — let it run in the background
+    backfillAgent.run().catch(err => logger.error(`Manual backfill error: ${err.message}`));
+    res.json({ status: 'started', message: 'Backfill agent triggered — check /api/admin/runs for progress' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── GET /api/admin/runs ────────────────────────────────────────
 router.get('/runs', async (req, res, next) => {
   try {
