@@ -4,6 +4,8 @@ const router = express.Router();
 
 const SITE_URL = 'https://reviewerinsight.com';
 
+const GENRES = ['Fiction', 'Non-Fiction', 'History', 'Business', 'Sci-Fi', 'Nature', 'Essays', 'Memoir', 'Biography'];
+
 // Cache sitemap for 1 hour
 let cachedSitemap = null;
 let cacheTime = 0;
@@ -29,15 +31,23 @@ async function generateSitemap() {
     { loc: '/membership', priority: '0.5', changefreq: 'monthly' },
   ];
 
-  // Published books
+  // Genre pages
+  const genrePages = GENRES.map(g => ({
+    loc: `/browse?genre=${encodeURIComponent(g)}`,
+    priority: '0.8',
+    changefreq: 'daily',
+  }));
+
+  // Published books — include cover for image sitemap
   const books = await Book.find({ status: 'published' })
-    .select('_id title updatedAt')
+    .select('_id title author updatedAt featured coverDesign')
     .lean();
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-  xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+  xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n';
+  xml += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
 
-  for (const page of staticPages) {
+  for (const page of [...staticPages, ...genrePages]) {
     xml += '  <url>\n';
     xml += `    <loc>${escXml(SITE_URL + page.loc)}</loc>\n`;
     xml += `    <lastmod>${now}</lastmod>\n`;
@@ -49,11 +59,25 @@ async function generateSitemap() {
   for (const book of books) {
     const slug = slugify(book.title);
     const lastmod = book.updatedAt ? new Date(book.updatedAt).toISOString() : now;
+    const priority = book.featured ? '0.9' : '0.7';
+    const bookUrl = escXml(`${SITE_URL}/book/${book._id}/${slug}`);
+
     xml += '  <url>\n';
-    xml += `    <loc>${escXml(`${SITE_URL}/book/${book._id}/${slug}`)}</loc>\n`;
+    xml += `    <loc>${bookUrl}</loc>\n`;
     xml += `    <lastmod>${lastmod}</lastmod>\n`;
     xml += '    <changefreq>weekly</changefreq>\n';
-    xml += '    <priority>0.7</priority>\n';
+    xml += `    <priority>${priority}</priority>\n`;
+
+    // Image sitemap entry if there's a cover image URL
+    const coverUrl = book.coverDesign?.imageUrl;
+    if (coverUrl) {
+      xml += '    <image:image>\n';
+      xml += `      <image:loc>${escXml(coverUrl)}</image:loc>\n`;
+      xml += `      <image:title>${escXml(book.title)}</image:title>\n`;
+      if (book.author) xml += `      <image:caption>${escXml(`${book.title} by ${book.author}`)}</image:caption>\n`;
+      xml += '    </image:image>\n';
+    }
+
     xml += '  </url>\n';
   }
 
