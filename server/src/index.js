@@ -41,7 +41,9 @@ async function startServer() {
   // Serve the frontend static files
   app.use(express.static(path.join(__dirname, '../../project')));
 
-  // API routes
+  // API routes — trendingRouter must be before booksRouter so /api/books/trending
+  // isn't swallowed by booksRouter's /:id wildcard route
+  app.use('/api/books', trendingRouter);
   app.use('/api/books', booksRouter);
   app.use('/api/genres', genresRouter);
   app.use('/api/editors', editorsRouter);
@@ -50,7 +52,6 @@ async function startServer() {
   app.use('/api/admin', adminRouter);
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
-  app.use('/api/books', trendingRouter);
 
   // Health check
   app.get('/api/health', (req, res) => {
