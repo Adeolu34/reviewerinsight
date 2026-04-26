@@ -37,6 +37,8 @@ const Home = ({ setRoute, accent, density }) => {
   const [editRef, editVis] = useReveal();
   const [ctaRef, ctaVis] = useReveal();
 
+  const [trendingModal, setTrendingModal] = React.useState(null);
+
   return (
     <div className="ri-page-enter" style={{ background:'#F5EFE4' }}>
       {/* HERO — massive editorial block with animated entrance */}
@@ -191,8 +193,8 @@ const Home = ({ setRoute, accent, density }) => {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 28, rowGap: 36 }}>
             {trending.slice(0, 8).map((b, idx) => (
-              <a key={`${b.title}-${idx}`} href={amazonAffiliateUrl(b)} target="_blank" rel="noopener noreferrer" style={{
-                textDecoration:'none', color:'#141210', cursor:'pointer',
+              <div key={`${b.title}-${idx}`} onClick={() => setTrendingModal(b)} style={{
+                color:'#141210', cursor:'pointer',
                 opacity: trendVis ? 1 : 0,
                 transform: trendVis ? 'translateY(0)' : 'translateY(28px)',
                 transition: `all .5s ${Math.min(idx * .06, .5)}s cubic-bezier(.2,.8,.2,1)`
@@ -210,7 +212,7 @@ const Home = ({ setRoute, accent, density }) => {
                   <div style={{ font:'400 12px "Space Grotesk", sans-serif', opacity:.7, marginTop: 2 }}>{b.author}</div>
                   {b.rating && <div style={{ marginTop: 8 }}><Stars value={b.rating} size={11}/></div>}
                 </div>
-              </a>
+              </div>
             ))}
           </div>
         </section>
@@ -389,6 +391,69 @@ const Home = ({ setRoute, accent, density }) => {
       </section>
 
       <Footer accent={accent} pad={pad}/>
+
+      {/* TRENDING BOOK MODAL */}
+      {trendingModal && (
+        <div onClick={() => setTrendingModal(null)} style={{
+          position:'fixed', inset:0, background:'rgba(20,18,16,0.72)', zIndex:1000,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:24,
+          animation:'ri-fadeIn .2s ease both',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background:'#F5EFE4', maxWidth:560, width:'100%', padding:40,
+            position:'relative', animation:'ri-fadeUp .3s cubic-bezier(.2,.8,.2,1) both',
+            maxHeight:'90vh', overflowY:'auto',
+          }}>
+            <button onClick={() => setTrendingModal(null)} style={{
+              position:'absolute', top:16, right:16, background:'transparent', border:0,
+              cursor:'pointer', font:'600 11px "JetBrains Mono", monospace',
+              textTransform:'uppercase', letterSpacing:'.14em', opacity:.5,
+            }}>✕ Close</button>
+
+            <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:28, alignItems:'start' }}>
+              {trendingModal.coverImageUrl ? (
+                <img src={trendingModal.coverImageUrl} alt={trendingModal.title}
+                     style={{ width:130, height:190, objectFit:'contain', background:'#14121008' }} />
+              ) : (
+                <div style={{ width:130, height:190, background:'#141210', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <span style={{ font:'700 13px/1.2 "DM Serif Display", Georgia, serif', color:'#F5EFE4', textAlign:'center', padding:12 }}>
+                    {trendingModal.title}
+                  </span>
+                </div>
+              )}
+              <div>
+                <Eyebrow color={accent}>{trendingModal.genre || 'Books'}{trendingModal.year ? ` · ${trendingModal.year}` : ''}</Eyebrow>
+                <h2 style={{ font:'700 28px/1.1 "DM Serif Display", Georgia, serif', margin:'8px 0 4px', letterSpacing:'-.01em' }}>
+                  {trendingModal.title}
+                </h2>
+                <div style={{ font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em', opacity:.65, marginBottom:12 }}>
+                  {trendingModal.author}
+                </div>
+                {trendingModal.rating && <Stars value={trendingModal.rating} />}
+              </div>
+            </div>
+
+            {trendingModal.description && (
+              <p style={{ font:'400 15px/1.6 "Space Grotesk", sans-serif', margin:'24px 0 0', color:'#141210' }}>
+                {trendingModal.description}
+              </p>
+            )}
+
+            <div style={{ display:'flex', gap:12, marginTop:28 }}>
+              <a href={amazonAffiliateUrl(trendingModal)} target="_blank" rel="noopener noreferrer" style={{
+                font:'700 13px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
+                padding:'14px 24px', background:accent, color:'#141210', borderRadius:999,
+                textDecoration:'none', display:'inline-block',
+              }}>Buy on Amazon →</a>
+              <button onClick={() => setTrendingModal(null)} style={{
+                font:'700 13px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
+                padding:'14px 24px', background:'transparent', color:'#141210', border:'1.5px solid #141210',
+                cursor:'pointer', borderRadius:999,
+              }}>Back</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
