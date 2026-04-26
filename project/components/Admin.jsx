@@ -442,9 +442,155 @@ const TriggerModal = ({ onClose, onDone }) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SECTION: Books
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const VALID_GENRES = ['Fiction', 'Essays', 'Memoir', 'Sci-Fi', 'History', 'Business', 'Nature'];
+
+const guessGenre = (categories = []) => {
+  const cats = categories.join(' ').toLowerCase();
+  if (cats.includes('science fiction') || cats.includes('sci-fi')) return 'Sci-Fi';
+  if (cats.includes('fiction') || cats.includes('novel')) return 'Fiction';
+  if (cats.includes('history')) return 'History';
+  if (cats.includes('business') || cats.includes('economics') || cats.includes('finance')) return 'Business';
+  if (cats.includes('essay')) return 'Essays';
+  if (cats.includes('memoir') || cats.includes('biography') || cats.includes('autobiography')) return 'Memoir';
+  if (cats.includes('nature') || cats.includes('science') || cats.includes('environment')) return 'Nature';
+  return 'Fiction';
+};
+
+const SearchImportModal = ({ onClose, onImported }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchErr, setSearchErr] = useState('');
+  const [importing, setImporting] = useState({});
+  const [imported, setImported] = useState({});
+  const [genres, setGenres] = useState({});
+  const debounceRef = useRef(null);
+
+  const doSearch = async (q) => {
+    if (q.trim().length < 2) { setResults([]); return; }
+    setSearching(true); setSearchErr('');
+    try {
+      const { results: r } = await AdminClient.searchExternal(q.trim());
+      setResults(r);
+      const initial = {};
+      r.forEach((b, i) => { initial[i] = guessGenre(b.categories || []); });
+      setGenres(initial);
+    } catch (e) {
+      setSearchErr(e.message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleQueryChange = (v) => {
+    setQuery(v);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(v), 500);
+  };
+
+  const handleImport = async (book, idx) => {
+    setImporting(p => ({ ...p, [idx]: true }));
+    try {
+      await AdminClient.importBook({
+        title: book.title,
+        author: book.author,
+        year: book.year,
+        genre: genres[idx] || 'Fiction',
+        isbn: book.isbn,
+        description: book.description,
+        coverUrl: book.coverUrl,
+        pages: book.pages,
+        sources: { googleBooksId: book.googleBooksId, openLibraryKey: book.openLibraryKey },
+      });
+      setImported(p => ({ ...p, [idx]: true }));
+      setResults(p => p.map((b, i) => i === idx ? { ...b, alreadyImported: true } : b));
+      onImported && onImported();
+    } catch (e) {
+      if (e.message?.includes('already exists')) {
+        setResults(p => p.map((b, i) => i === idx ? { ...b, alreadyImported: true } : b));
+      } else {
+        alert(`Import failed: ${e.message}`);
+      }
+    } finally {
+      setImporting(p => ({ ...p, [idx]: false }));
+    }
+  };
+
+  return (
+    <Modal title="Search & Import Book" onClose={onClose} width={700}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        <Input value={query} onChange={handleQueryChange} placeholder="Search by title, author, or ISBN…" autoFocus />
+
+        {searching && (
+          <div style={{ color: T.muted, fontFamily: T.mono, fontSize: 12, textAlign: 'center', padding: 24 }}>Searching…</div>
+        )}
+        {searchErr && (
+          <div style={{ color: T.err, fontFamily: T.mono, fontSize: 12 }}>{searchErr}</div>
+        )}
+        {!searching && query.length >= 2 && results.length === 0 && !searchErr && (
+          <div style={{ color: T.muted, fontFamily: T.mono, fontSize: 12, textAlign: 'center', padding: 24 }}>No results found</div>
+        )}
+
+        {results.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 500, overflowY: 'auto', paddingRight: 4 }}>
+            {results.map((book, idx) => {
+              const done = book.alreadyImported || imported[idx];
+              return (
+                <div key={idx} style={{
+                  display: 'grid', gridTemplateColumns: '56px 1fr auto', gap: 14, alignItems: 'center',
+                  padding: '12px 14px', background: T.hover, borderRadius: 8,
+                  border: `1px solid ${done ? T.ok + '50' : T.border}`,
+                }}>
+                  {/* Cover */}
+                  {book.coverUrl
+                    ? <img src={book.coverUrl} alt={book.title} style={{ width: 56, height: 76, objectFit: 'cover', borderRadius: 4 }} />
+                    : <div style={{ width: 56, height: 76, background: T.border, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>📚</div>
+                  }
+
+                  {/* Info */}
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.serif, color: T.text, marginBottom: 3 }}>{book.title}</div>
+                    <div style={{ fontSize: 11, fontFamily: T.mono, color: T.muted, marginBottom: 8 }}>
+                      {book.author}{book.year ? ` · ${book.year}` : ''}{book.pages ? ` · ${book.pages}pp` : ''}
+                      {' · '}
+                      <span style={{ color: book.source === 'google' ? T.info : T.ok }}>
+                        {book.source === 'google' ? 'Google Books' : 'Open Library'}
+                      </span>
+                    </div>
+                    {!done && (
+                      <Select value={genres[idx] || 'Fiction'} onChange={v => setGenres(p => ({ ...p, [idx]: v }))}>
+                        {VALID_GENRES.map(g => <option key={g}>{g}</option>)}
+                      </Select>
+                    )}
+                  </div>
+
+                  {/* Action */}
+                  <div style={{ textAlign: 'right', minWidth: 80 }}>
+                    {done
+                      ? <span style={{ fontSize: 11, fontFamily: T.mono, color: T.ok, fontWeight: 700 }}>✓ In DB</span>
+                      : <Btn small disabled={importing[idx]} onClick={() => handleImport(book, idx)}>
+                          {importing[idx] ? '…' : 'Import →'}
+                        </Btn>
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, fontFamily: T.mono, color: T.dim }}>
+          Importing a book queues it for AI review generation — ready in under 20 minutes.
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const BooksSection = ({ params = {} }) => {
   const [filters, setFilters] = useState({ status: params.status || '', genre: params.genre || '', editor: params.editor || '', search: '', page: 1 });
   const [modal, setModal] = useState(null); // { type, book }
+  const [showSearchImport, setShowSearchImport] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const debounceRef = useRef(null);
 
@@ -467,28 +613,42 @@ const BooksSection = ({ params = {} }) => {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      {/* Filters */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 10 }}>
-        <Input value={searchInput} onChange={handleSearch} placeholder="Search books..." />
-        <Select value={filters.status} onChange={v => setFilters({ ...filters, status: v, page: 1 })}>
-          <option value="">All Statuses</option>
-          <option>discovered</option><option>metadata_complete</option><option>review_pending</option>
-          <option>review_complete</option><option>published</option><option>failed</option>
-        </Select>
-        <Select value={filters.genre} onChange={v => setFilters({ ...filters, genre: v, page: 1 })}>
-          <option value="">All Genres</option>
-          <option>Fiction</option><option>Essays</option><option>Memoir</option><option>Sci-Fi</option>
-          <option>History</option><option>Business</option><option>Nature</option>
-        </Select>
-        <Select value={filters.editor} onChange={v => setFilters({ ...filters, editor: v, page: 1 })}>
-          <option value="">All Editors</option>
-          <option>Mira Okafor</option><option>Jules Park</option><option>Dae Han</option><option>Noor Saleh</option>
-        </Select>
+      {/* Filters + Search & Import */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flex: '2 1 160px' }}><Input value={searchInput} onChange={handleSearch} placeholder="Search books..." /></div>
+        <div style={{ flex: '1 1 120px' }}>
+          <Select value={filters.status} onChange={v => setFilters({ ...filters, status: v, page: 1 })}>
+            <option value="">All Statuses</option>
+            <option>discovered</option><option>metadata_complete</option><option>review_pending</option>
+            <option>review_complete</option><option>published</option><option>failed</option>
+          </Select>
+        </div>
+        <div style={{ flex: '1 1 100px' }}>
+          <Select value={filters.genre} onChange={v => setFilters({ ...filters, genre: v, page: 1 })}>
+            <option value="">All Genres</option>
+            <option>Fiction</option><option>Essays</option><option>Memoir</option><option>Sci-Fi</option>
+            <option>History</option><option>Business</option><option>Nature</option>
+          </Select>
+        </div>
+        <div style={{ flex: '1 1 100px' }}>
+          <Select value={filters.editor} onChange={v => setFilters({ ...filters, editor: v, page: 1 })}>
+            <option value="">All Editors</option>
+            <option>Mira Okafor</option><option>Jules Park</option><option>Dae Han</option><option>Noor Saleh</option>
+          </Select>
+        </div>
+        <Btn onClick={() => setShowSearchImport(true)}>+ Search & Import</Btn>
       </div>
 
       <div style={{ fontSize: 12, fontFamily: T.mono, color: T.muted }}>
         Showing {data?.books?.length || 0} of {data?.total || 0} books
       </div>
+
+      {showSearchImport && (
+        <SearchImportModal
+          onClose={() => setShowSearchImport(false)}
+          onImported={() => { refresh(); }}
+        />
+      )}
 
       {loading ? <div style={{ color: T.muted, fontFamily: T.mono, padding: 20 }}>Loading...</div> : (
         <>

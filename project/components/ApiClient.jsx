@@ -215,6 +215,12 @@ const AdminClient = {
   triggerBackfill() {
     return this._fetch('/trigger-backfill', { method: 'POST' });
   },
+  searchExternal(query) {
+    return this._fetch('/search-external', { method: 'POST', body: JSON.stringify({ query }) });
+  },
+  importBook(data) {
+    return this._fetch('/import-book', { method: 'POST', body: JSON.stringify(data) });
+  },
   retryBook(id, step = 'review') {
     return this._fetch(`/books/${id}/retry`, { method: 'POST', body: JSON.stringify({ step }) });
   },
