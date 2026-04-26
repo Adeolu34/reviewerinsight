@@ -40,6 +40,7 @@ const Home = ({ setRoute, accent, density }) => {
   const [trendingModal, setTrendingModal] = React.useState(null);
 
   return (
+    <React.Fragment>
     <div className="ri-page-enter" style={{ background:'#F5EFE4' }}>
       {/* HERO — massive editorial block with animated entrance */}
       <section style={{ padding: `48px ${pad}px 36px`, borderBottom:'1.5px solid #141210', overflow:'hidden' }}>
@@ -391,8 +392,9 @@ const Home = ({ setRoute, accent, density }) => {
       </section>
 
       <Footer accent={accent} pad={pad}/>
+    </div>
 
-      {/* TRENDING BOOK MODAL */}
+      {/* TRENDING BOOK MODAL — outside ri-page-enter to avoid transform stacking context */}
       {trendingModal && (
         <div onClick={() => setTrendingModal(null)} style={{
           position:'fixed', inset:0, background:'rgba(20,18,16,0.72)', zIndex:1000,
@@ -454,7 +456,7 @@ const Home = ({ setRoute, accent, density }) => {
           </div>
         </div>
       )}
-    </div>
+    </React.Fragment>
   );
 };
 
