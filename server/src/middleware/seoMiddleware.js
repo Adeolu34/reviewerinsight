@@ -81,8 +81,7 @@ function homeMeta() {
   };
 }
 
-function browseMeta(genre) {
-  const genreLabel = genre ? `${genre} Books` : 'All Books';
+async function browseMeta(genre) {
   const title = genre
     ? `${genre} Book Reviews — Reviewer Insight`
     : 'Browse Book Reviews — Reviewer Insight';
@@ -93,19 +92,39 @@ function browseMeta(genre) {
     ? `${SITE_URL}/browse?genre=${encodeURIComponent(genre)}`
     : `${SITE_URL}/browse`;
 
-  return {
-    title,
-    description,
-    canonical,
-    ogType: 'website',
-    jsonLd: buildJsonLd({
+  // ItemList schema: top books for this genre/page so Google can show rich results
+  let itemListElement = [];
+  try {
+    const query = genre
+      ? { status: 'published', genre }
+      : { status: 'published' };
+    const topBooks = await Book.find(query)
+      .select('_id title author rating')
+      .sort({ rating: -1 })
+      .limit(10)
+      .lean();
+    itemListElement = topBooks.map((b, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${SITE_URL}/book/${b._id}/${slugify(b.title)}`,
+      name: `${b.title} by ${b.author}`,
+    }));
+  } catch (_) {}
+
+  const jsonLd = [
+    buildJsonLd({
       '@type': 'CollectionPage',
       name: title,
       url: canonical,
       description,
       isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: SITE_URL },
     }),
-  };
+    itemListElement.length
+      ? buildJsonLd({ '@type': 'ItemList', name: title, url: canonical, itemListElement })
+      : '',
+  ].filter(Boolean).join('\n');
+
+  return { title, description, canonical, ogType: 'website', jsonLd };
 }
 
 function recommendMeta() {
@@ -168,6 +187,24 @@ async function bookMeta(bookId) {
   try {
     const book = await Book.findById(bookId).lean();
     if (!book || book.status !== 'published') return null;
+
+    // Fetch related books in parallel — same genre and same author
+    const [sameGenreBooks, sameAuthorBooks] = await Promise.all([
+      book.genre
+        ? Book.find({ status: 'published', genre: book.genre, _id: { $ne: book._id } })
+            .select('_id title author genre').limit(8).lean()
+        : Promise.resolve([]),
+      Book.find({ status: 'published', author: book.author, _id: { $ne: book._id } })
+        .select('_id title author genre').limit(4).lean(),
+    ]);
+
+    // Dedupe by id, keep genre matches first
+    const seen = new Set([String(book._id)]);
+    const relatedBooks = [];
+    for (const b of [...sameGenreBooks, ...sameAuthorBooks]) {
+      const id = String(b._id);
+      if (!seen.has(id)) { seen.add(id); relatedBooks.push(b); }
+    }
 
     const slug = slugify(book.title);
     const canonical = `${SITE_URL}/book/${book._id}/${slug}`;
@@ -241,7 +278,7 @@ async function bookMeta(bookId) {
 
     // ── Visible server-rendered content (indexed by crawlers) ───
     // Injected into #root before React mounts. React replaces it on hydration.
-    const seoContent = buildSeoContent(book, canonical);
+    const seoContent = buildSeoContent(book, canonical, relatedBooks);
 
     return {
       title,
@@ -263,12 +300,30 @@ async function bookMeta(bookId) {
   }
 }
 
-function buildSeoContent(book, canonical) {
+function buildSeoContent(book, canonical, relatedBooks = []) {
   const paragraphs = (book.review?.paragraphs || []).map(p => `<p>${escHtml(p)}</p>`).join('');
   const takeaways = (book.takeaways || []).map(t => `<li>${escHtml(t)}</li>`).join('');
   const summaryBullets = (book.review?.summaryBullets || []).map(b => `<li>${escHtml(b)}</li>`).join('');
   const chapters = (book.chapterSummaries || []).slice(0, 5)
     .map(ch => `<dt>Chapter ${ch.chapter}: ${escHtml(ch.title)}</dt><dd>${escHtml(ch.summary)}</dd>`).join('');
+
+  // Group related links by section: same genre vs same author
+  const genreLinks = relatedBooks
+    .filter(b => b.genre === book.genre)
+    .slice(0, 6)
+    .map(b => `<li><a href="${SITE_URL}/book/${b._id}/${slugify(b.title)}">${escHtml(b.title)} by ${escHtml(b.author)}</a></li>`)
+    .join('');
+  const authorLinks = relatedBooks
+    .filter(b => b.author === book.author && b.genre !== book.genre)
+    .slice(0, 3)
+    .map(b => `<li><a href="${SITE_URL}/book/${b._id}/${slugify(b.title)}">${escHtml(b.title)}</a></li>`)
+    .join('');
+
+  const relatedSection = [
+    genreLinks ? `<h3>More ${escHtml(book.genre || '')} Books</h3><ul>${genreLinks}</ul>` : '',
+    authorLinks ? `<h3>More by ${escHtml(book.author)}</h3><ul>${authorLinks}</ul>` : '',
+    book.genre ? `<p><a href="${SITE_URL}/browse?genre=${encodeURIComponent(book.genre)}">Browse all ${escHtml(book.genre)} reviews</a></p>` : '',
+  ].filter(Boolean).join('\n');
 
   return `<article itemscope itemtype="https://schema.org/Review" style="display:none" aria-hidden="true">
   <h1 itemprop="name">${escHtml(book.title)}</h1>
@@ -283,6 +338,7 @@ function buildSeoContent(book, canonical) {
   ${summaryBullets ? `<h3>Summary</h3><ul>${summaryBullets}</ul>` : ''}
   ${chapters ? `<h3>Chapter Guide</h3><dl>${chapters}</dl>` : ''}
   <p>Read the full review at <a href="${escHtml(canonical)}">${escHtml(canonical)}</a></p>
+  ${relatedSection}
 </article>`;
 }
 
