@@ -1,5 +1,6 @@
 const { openai, model, chatJsonObjectMode } = require('../config/openai');
 const { jsonFromAssistantContent } = require('../utils/jsonFromAssistant');
+const { parseChapterSummariesResponse } = require('../utils/chapterSummaryParse');
 const { withRetry } = require('../utils/retry');
 const logger = require('../utils/logger');
 
@@ -160,19 +161,24 @@ async function generateChapterSummary(book, persona) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        { temperature: 0.7, max_tokens: 1200 },
+        { temperature: 0.7, max_tokens: 8192 },
       ),
     );
   }, { label: `LLM chapters: "${book.title}"`, maxAttempts: 2 });
 
-  const content = response.choices[0].message.content;
+  const choice = response.choices[0];
+  const content = choice.message.content;
   const tokensUsed = response.usage?.total_tokens || 0;
+
+  if (choice.finish_reason === 'length') {
+    logger.warn(`[Chapters] Response truncated (max_tokens) for "${book.title}" — using partial parse if possible`);
+  }
 
   let parsed;
   try {
-    parsed = jsonFromAssistantContent(content);
+    parsed = parseChapterSummariesResponse(content);
   } catch (err) {
-    throw new Error(`Failed to parse chapter summary response as JSON: ${content.substring(0, 200)}`);
+    throw new Error(`Failed to parse chapter summary response as JSON: ${err.message}. Snippet: ${String(content).substring(0, 280)}`);
   }
 
   const chapterSummaries = validateChapterSummaries(parsed, book.title);
@@ -202,20 +208,21 @@ REQUIRED JSON OUTPUT FORMAT:
     {
       "chapter": 1,
       "title": "Chapter or section title",
-      "summary": "2-3 sentence summary of this chapter/section.",
+      "summary": "At most 2 sentences, under 320 characters.",
       "themes": ["theme1", "theme2"]
     }
   ]
 }
 
 RULES:
-- Generate between 6 and 15 ${sectionWord} entries, depending on the book's length and structure.
+- Generate **6 to 10** ${sectionWord} entries only (never more than 10). Prefer fewer, denser entries for long books.
 - For ${isFiction ? 'fiction: use chapter numbers and titles. If you know the actual chapter titles, use them. Otherwise, create descriptive titles.' : 'non-fiction: use part/section numbers. Group by the book\'s natural structure (parts, sections, or thematic groupings).'}
-- Each "summary" should be 2-3 sentences. Be specific about what happens or what is argued in that section.
-- Each "themes" array should contain 1-3 short thematic tags (2-4 words each).
+- Each "summary" must be **at most 2 sentences** and **under 320 characters** so the full JSON fits in one response.
+- Each "themes" array: **1–2** short tags only (2–4 words each).
 - "chapter" must be a sequential integer starting from 1.
 - Base this on your genuine knowledge of the book. If you know the book well, reflect its actual structure. If you are working from the description, create a plausible structure that matches the description and genre conventions.
 - These are AI-generated overviews, not verbatim reproductions of the text.
+- Output **valid JSON only**: one object with a single key "chapters" whose value is an array of objects. Do not truncate the closing brackets.
 
 Be specific and substantive. Avoid generic descriptions.`;
 }
