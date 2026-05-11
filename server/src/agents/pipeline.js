@@ -5,8 +5,7 @@ const { generateReview, generateChapterSummary } = require('../services/openaiRe
 const { generateCoverDesign } = require('../services/coverResolver');
 const logger = require('../utils/logger');
 
-// Concurrent requests to OpenAI — high enough to be fast, low enough to
-// stay well within rate limits (gpt-4o allows 10k RPM).
+// Concurrent LLM requests — tuned for OpenRouter / provider rate limits.
 const REVIEW_CONCURRENCY = 5;
 const CHAPTER_CONCURRENCY = 3;
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const Book = require('../models/Book');
-const { openai, model } = require('../config/openai');
+const { openai, model, chatJsonObjectMode } = require('../config/openai');
+const { jsonFromAssistantContent } = require('../utils/jsonFromAssistant');
 const { withRetry } = require('../utils/retry');
 const externalBooks = require('../services/externalBooks');
 const logger = require('../utils/logger');
@@ -284,20 +285,28 @@ ${bookList}
 
 Return only JSON: { "intro": "...", "readingOrder": "..." or null, "ageNote": "..." or null }`;
 
+  const system = chatJsonObjectMode
+    ? 'You write concise, editorial prose for a literary magazine. No clichés. Return only valid JSON.'
+    : 'You write concise, editorial prose for a literary magazine. No clichés. Return a single valid JSON object only (no markdown, no commentary).';
+
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.8,
+    max_tokens: 280,
+  };
+  if (chatJsonObjectMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
   const response = await withRetry(async () => {
-    return await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: 'You write concise, editorial prose for a literary magazine. No clichés. Return only valid JSON.' },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.8,
-      max_tokens: 280,
-    });
+    return await openai.chat.completions.create(body);
   }, { label: 'Prescription', maxAttempts: 2 });
 
-  const parsed = JSON.parse(response.choices[0].message.content);
+  const parsed = jsonFromAssistantContent(response.choices[0].message.content);
   return {
     intro: parsed.intro || '',
     readingOrder: parsed.readingOrder || null,

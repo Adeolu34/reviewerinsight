@@ -85,6 +85,9 @@ const Cover = ({ book, size = "md", rotate = 0, float: shouldFloat = false }) =>
             <img
               src={coverImageUrl}
               alt={`Cover of ${title}`}
+              loading={size === 'xl' ? 'eager' : 'lazy'}
+              decoding="async"
+              fetchPriority={size === 'xl' ? 'high' : 'auto'}
               onError={() => setImgFailed(true)}
               style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
             />

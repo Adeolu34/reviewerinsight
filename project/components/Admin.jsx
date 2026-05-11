@@ -989,16 +989,17 @@ const SystemSection = () => {
       <Card title="Configuration">
         <div style={{ display: 'grid', gap: 0 }}>
           {[
-            ['OpenAI Model', data.config.openaiModel],
-            ['Daily Budget', fmtCost(data.config.dailyBudget)],
-            ['OpenAI API Key', data.config.openaiConfigured ? 'Configured' : 'Not set'],
+            ['LLM provider', data.config.llmProvider || 'openai'],
+            ['Active LLM model', data.config.llmModel || data.config.openaiModel],
+            ['Daily budget', fmtCost(data.config.dailyBudget)],
+            ['LLM API key', data.config.llmApiKeyConfigured ? 'Configured' : 'Not set'],
             ['Google Books API', data.config.googleBooksConfigured ? 'Configured' : 'Not set'],
             ['Admin Key', data.config.adminKeyConfigured ? 'Configured' : 'Not set'],
             ['Environment', data.config.nodeEnv],
             ['Node.js', data.process.nodeVersion],
             ['Platform', data.process.platform],
           ].map(([label, value], i) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < 7 ? `1px solid ${T.border}` : 'none' }}>
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < 8 ? `1px solid ${T.border}` : 'none' }}>
               <span style={{ fontSize: 12, fontFamily: T.mono, color: T.muted }}>{label}</span>
               <span style={{ fontSize: 13, fontFamily: T.mono, fontWeight: 600, color: typeof value === 'string' && value.includes('Not set') ? T.warn : T.text }}>{value}</span>
             </div>

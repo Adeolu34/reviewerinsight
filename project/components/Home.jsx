@@ -201,7 +201,7 @@ const Home = ({ setRoute, accent, density }) => {
                 transition: `all .5s ${Math.min(idx * .06, .5)}s cubic-bezier(.2,.8,.2,1)`
               }} className="ri-card">
                 {b.coverImageUrl ? (
-                  <img src={b.coverImageUrl} alt={b.title} style={{ width:'100%', height: 220, objectFit:'contain', borderRadius: 2, background:'#14121008' }} />
+                  <img src={b.coverImageUrl} alt={b.title} loading="lazy" decoding="async" style={{ width:'100%', height: 220, objectFit:'contain', borderRadius: 2, background:'#14121008' }} />
                 ) : (
                   <div style={{ width:'100%', height: 220, background:'#141210', display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <span style={{ font:'700 14px/1.15 "DM Serif Display", Georgia, serif', color:'#F5EFE4', textAlign:'center', padding: 16 }}>{b.title}</span>
@@ -414,7 +414,7 @@ const Home = ({ setRoute, accent, density }) => {
 
             <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:28, alignItems:'start' }}>
               {trendingModal.coverImageUrl ? (
-                <img src={trendingModal.coverImageUrl} alt={trendingModal.title}
+                <img src={trendingModal.coverImageUrl} alt={trendingModal.title} loading="lazy" decoding="async"
                      style={{ width:130, height:190, objectFit:'contain', background:'#14121008' }} />
               ) : (
                 <div style={{ width:130, height:190, background:'#141210', display:'flex', alignItems:'center', justifyContent:'center' }}>

@@ -308,7 +308,7 @@ const ExternalBookCard = ({ book, index, accent }) => (
   }} className="ri-card">
     <div style={{ position: 'absolute', top: 10, right: 10, font: '600 8px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', padding: '3px 8px', background: '#14121010', borderRadius: 999, color: '#141210', opacity: .5 }}>External</div>
     {book.coverImageUrl ? (
-      <img src={book.coverImageUrl} alt={book.title} style={{ width: '100%', height: 200, objectFit: 'contain', borderRadius: 2, marginBottom: 14, background: '#14121008' }} />
+      <img src={book.coverImageUrl} alt={book.title} loading="lazy" decoding="async" style={{ width: '100%', height: 200, objectFit: 'contain', borderRadius: 2, marginBottom: 14, background: '#14121008' }} />
     ) : (
       <div style={{ width: '100%', height: 200, background: '#141210', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
         <span style={{ font: '700 14px/1.1 "DM Serif Display", Georgia, serif', color: '#F5EFE4', textAlign: 'center', padding: 16 }}>{book.title}</span>

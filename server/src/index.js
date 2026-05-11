@@ -78,7 +78,10 @@ async function startServer() {
   app.set('orchestrator', orchestrator);
 
   // Start scheduled agent runs (only if API keys are configured)
-  if (config.openaiKey && config.openaiKey !== 'sk-your-openai-key-here') {
+  const openAiPlaceholder = !config.openaiKey || config.openaiKey === 'sk-your-openai-key-here';
+  const llmReady = !!config.openrouterKey || !openAiPlaceholder;
+
+  if (llmReady) {
     orchestrator.startSchedule();
 
     // Continuous backfill: catches all books stuck in incomplete states
@@ -87,7 +90,7 @@ async function startServer() {
     app.set('backfillAgent', backfillAgent);
     backfillAgent.startSchedule();
   } else {
-    logger.warn('OpenAI API key not configured — agent scheduling disabled');
+    logger.warn('No LLM API key configured (OPENROUTER_API_KEY or OPENAI_API_KEY) — agent scheduling disabled');
   }
 
   const cron = require('node-cron');

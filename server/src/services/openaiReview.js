@@ -1,6 +1,24 @@
-const { openai, model } = require('../config/openai');
+const { openai, model, chatJsonObjectMode } = require('../config/openai');
+const { jsonFromAssistantContent } = require('../utils/jsonFromAssistant');
 const { withRetry } = require('../utils/retry');
 const logger = require('../utils/logger');
+
+function llmConfigHint() {
+  return 'Set OPENROUTER_API_KEY (OpenRouter) or OPENAI_API_KEY in .env';
+}
+
+function buildChatCompletionBody(messages, { temperature, max_tokens }) {
+  const body = {
+    model,
+    messages,
+    temperature,
+    max_tokens,
+  };
+  if (chatJsonObjectMode) {
+    body.response_format = { type: 'json_object' };
+  }
+  return body;
+}
 
 /**
  * Generate a complete book review using OpenAI.
@@ -9,31 +27,33 @@ const logger = require('../utils/logger');
  * @returns {Object} { review, tokensUsed }
  */
 async function generateReview(book, persona) {
-  if (!openai) throw new Error('OpenAI client not configured. Set OPENAI_API_KEY in .env');
+  if (!openai) throw new Error(`LLM client not configured. ${llmConfigHint()}`);
 
   const userPrompt = buildUserPrompt(book);
+  const systemPrompt = chatJsonObjectMode
+    ? persona.systemPrompt
+    : `${persona.systemPrompt}\n\nRespond with a single valid JSON object only (no markdown, no commentary).`;
 
   const response = await withRetry(async () => {
-    return await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: persona.systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.8,
-      max_tokens: 1800,
-    });
-  }, { label: `OpenAI review: "${book.title}"`, maxAttempts: 2 });
+    return await openai.chat.completions.create(
+      buildChatCompletionBody(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        { temperature: 0.8, max_tokens: 1800 },
+      ),
+    );
+  }, { label: `LLM review: "${book.title}"`, maxAttempts: 2 });
 
   const content = response.choices[0].message.content;
   const tokensUsed = response.usage?.total_tokens || 0;
 
   let parsed;
   try {
-    parsed = JSON.parse(content);
+    parsed = jsonFromAssistantContent(content);
   } catch (err) {
-    throw new Error(`Failed to parse OpenAI response as JSON: ${content.substring(0, 200)}`);
+    throw new Error(`Failed to parse LLM response as JSON: ${content.substring(0, 200)}`);
   }
 
   // Validate the response structure
@@ -126,29 +146,31 @@ function validateReview(parsed, title) {
  * @returns {Object} { chapterSummaries, tokensUsed }
  */
 async function generateChapterSummary(book, persona) {
-  if (!openai) throw new Error('OpenAI client not configured. Set OPENAI_API_KEY in .env');
+  if (!openai) throw new Error(`LLM client not configured. ${llmConfigHint()}`);
 
   const userPrompt = buildChapterPrompt(book);
+  const systemPrompt = chatJsonObjectMode
+    ? persona.systemPrompt
+    : `${persona.systemPrompt}\n\nRespond with a single valid JSON object only (no markdown, no commentary).`;
 
   const response = await withRetry(async () => {
-    return await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: persona.systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
-      max_tokens: 1200,
-    });
-  }, { label: `OpenAI chapters: "${book.title}"`, maxAttempts: 2 });
+    return await openai.chat.completions.create(
+      buildChatCompletionBody(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        { temperature: 0.7, max_tokens: 1200 },
+      ),
+    );
+  }, { label: `LLM chapters: "${book.title}"`, maxAttempts: 2 });
 
   const content = response.choices[0].message.content;
   const tokensUsed = response.usage?.total_tokens || 0;
 
   let parsed;
   try {
-    parsed = JSON.parse(content);
+    parsed = jsonFromAssistantContent(content);
   } catch (err) {
     throw new Error(`Failed to parse chapter summary response as JSON: ${content.substring(0, 200)}`);
   }
