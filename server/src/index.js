@@ -38,6 +38,10 @@ async function startServer() {
   app.use(securityHeaders);
   app.use(express.json());
 
+  // Sitemap + RSS before static — ensures /sitemap.xml and /feed.xml are always dynamic XML, not a missing static file or HTML fallback.
+  app.use(sitemapRouter);
+  app.use(feedRouter);
+
   // Serve the frontend static files
   app.use(express.static(path.join(__dirname, '../../project')));
 
@@ -57,10 +61,6 @@ async function startServer() {
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
-
-  // Sitemap + RSS feed (before catch-all)
-  app.use(sitemapRouter);
-  app.use(feedRouter);
 
   // Fallback: serve the frontend with SEO meta injection for non-API routes
   app.get('*', (req, res, next) => {

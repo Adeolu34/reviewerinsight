@@ -1,8 +1,9 @@
 const express = require('express');
 const Book = require('../models/Book');
+const config = require('../config/env');
 const router = express.Router();
 
-const SITE_URL = 'https://reviewerinsight.com';
+const SITE_URL = config.siteUrl;
 const SITE_NAME = 'Reviewer Insight';
 const FEED_DESC = 'In-depth book reviews, AI-powered summaries, and chapter breakdowns for serious readers.';
 const FEED_URL = `${SITE_URL}/feed.xml`;
