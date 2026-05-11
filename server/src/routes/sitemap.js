@@ -1,6 +1,7 @@
 const express = require('express');
 const Book = require('../models/Book');
 const config = require('../config/env');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -67,9 +68,15 @@ async function generateSitemap() {
     { path: '/membership', priority: '0.5', changefreq: 'monthly' },
   ];
 
-  const books = await Book.find({ status: 'published' })
-    .select('_id title author updatedAt featured coverImageUrl')
-    .lean();
+  let books = [];
+  try {
+    books = await Book.find({ status: 'published' })
+      .select('_id title author updatedAt featured coverImageUrl')
+      .maxTimeMS(20000)
+      .lean();
+  } catch (dbErr) {
+    logger.warn(`[Sitemap] Book query failed — serving static URLs only: ${dbErr.message}`);
+  }
 
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n';
@@ -88,7 +95,7 @@ async function generateSitemap() {
     const slug = slugify(book.title);
     const lastmod = book.updatedAt ? new Date(book.updatedAt).toISOString() : now;
     const priority = book.featured ? '0.9' : '0.7';
-    const bookPath = `/book/${book._id}/${slug}`;
+    const bookPath = `/book/${String(book._id)}/${slug}`;
     const bookUrl = locXml(bookPath);
 
     xml += '  <url>\n';
@@ -131,7 +138,7 @@ router.get('/sitemap.xml', async (req, res) => {
 
     sendSitemap(res, xml);
   } catch (err) {
-    console.error('[Sitemap] Error:', err.message);
+    logger.error(`[Sitemap] Error: ${err.message}`);
     res.status(500).set('Content-Type', 'text/plain; charset=utf-8').send('Sitemap generation failed');
   }
 });

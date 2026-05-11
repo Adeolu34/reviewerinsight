@@ -12,9 +12,12 @@ module.exports = {
   port: parseInt(process.env.PORT, 10) || 3001,
   mongoUri: process.env.MONGODB_URI,
   /** Canonical public origin (no trailing slash). Used for sitemap, feeds, and absolute URLs. */
-  siteUrl: (process.env.PUBLIC_SITE_URL || process.env.SITE_URL || 'https://reviewerinsight.com')
-    .trim()
-    .replace(/\/+$/, ''),
+  siteUrl: (() => {
+    const raw = (process.env.PUBLIC_SITE_URL || process.env.SITE_URL || 'https://reviewerinsight.com')
+      .trim()
+      .replace(/\/+$/, '');
+    return raw || 'https://reviewerinsight.com';
+  })(),
   openaiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
   /** When set, all chat completions use OpenRouter (cheapest Claude default: claude-3-haiku). */
