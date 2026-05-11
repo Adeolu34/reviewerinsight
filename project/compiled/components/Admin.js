@@ -1,12 +1,7 @@
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 // ─── Admin Dashboard for Reviewer Insight ──────────────────────
 // Dark-themed control panel: overview, agents, books, editors, analytics, system
-const {
-  useState,
-  useEffect,
-  useRef,
-  useCallback
-} = React;
+
 const T = {
   bg: '#0F0F0F',
   card: '#1A1A1A',
@@ -428,13 +423,13 @@ const Label = ({
 
 // ─── useAdminApi hook ───────────────────────────────────────────
 function useAdminApi(fetchFn, deps = []) {
-  const [state, setState] = useState({
+  const [state, setState] = React.useState({
     data: null,
     loading: true,
     error: null
   });
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
     let cancelled = false;
     setState(prev => ({
       ...prev,
@@ -828,13 +823,13 @@ const OverviewSection = ({
 // SECTION: Agent Runs
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const RunsSection = () => {
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = React.useState({
     editor: '',
     status: '',
     page: 1
   });
-  const [modal, setModal] = useState(null); // 'trigger' or run object
-  const [backfillMsg, setBackfillMsg] = useState('');
+  const [modal, setModal] = React.useState(null); // 'trigger' or run object
+  const [backfillMsg, setBackfillMsg] = React.useState('');
   const {
     data,
     loading,
@@ -1086,10 +1081,10 @@ const TriggerModal = ({
   onClose,
   onDone
 }) => {
-  const [editor, setEditor] = useState('Mira Okafor');
-  const [batch, setBatch] = useState('8');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [editor, setEditor] = React.useState('Mira Okafor');
+  const [batch, setBatch] = React.useState('8');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
   const go = async () => {
     setBusy(true);
     setMsg('');
@@ -1166,14 +1161,14 @@ const SearchImportModal = ({
   onClose,
   onImported
 }) => {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [searchErr, setSearchErr] = useState('');
-  const [importing, setImporting] = useState({});
-  const [imported, setImported] = useState({});
-  const [genres, setGenres] = useState({});
-  const debounceRef = useRef(null);
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState([]);
+  const [searching, setSearching] = React.useState(false);
+  const [searchErr, setSearchErr] = React.useState('');
+  const [importing, setImporting] = React.useState({});
+  const [imported, setImported] = React.useState({});
+  const [genres, setGenres] = React.useState({});
+  const debounceRef = React.useRef(null);
   const doSearch = async q => {
     if (q.trim().length < 2) {
       setResults([]);
@@ -1381,17 +1376,17 @@ const SearchImportModal = ({
 const BooksSection = ({
   params = {}
 }) => {
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = React.useState({
     status: params.status || '',
     genre: params.genre || '',
     editor: params.editor || '',
     search: '',
     page: 1
   });
-  const [modal, setModal] = useState(null); // { type, book }
-  const [showSearchImport, setShowSearchImport] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
-  const debounceRef = useRef(null);
+  const [modal, setModal] = React.useState(null); // { type, book }
+  const [showSearchImport, setShowSearchImport] = React.useState(false);
+  const [searchInput, setSearchInput] = React.useState('');
+  const debounceRef = React.useRef(null);
   const {
     data,
     loading,
@@ -1627,13 +1622,13 @@ const EditBookModal = ({
   onClose,
   onDone
 }) => {
-  const [status, setStatus] = useState(book.status);
-  const [rating, setRating] = useState(String(book.rating || ''));
-  const [editor, setEditor] = useState(book.editor || '');
-  const [genre, setGenre] = useState(book.genre || '');
-  const [featured, setFeatured] = useState(!!book.featured);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [status, setStatus] = React.useState(book.status);
+  const [rating, setRating] = React.useState(String(book.rating || ''));
+  const [editor, setEditor] = React.useState(book.editor || '');
+  const [genre, setGenre] = React.useState(book.genre || '');
+  const [featured, setFeatured] = React.useState(!!book.featured);
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
   const save = async () => {
     setBusy(true);
     try {
@@ -1733,8 +1728,8 @@ const DeleteBookModal = ({
   onClose,
   onDone
 }) => {
-  const [hard, setHard] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [hard, setHard] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
   const go = async () => {
     setBusy(true);
     try {
@@ -1815,8 +1810,8 @@ const RetryBookModal = ({
   onClose,
   onDone
 }) => {
-  const [step, setStep] = useState('review');
-  const [busy, setBusy] = useState(false);
+  const [step, setStep] = React.useState('review');
+  const [busy, setBusy] = React.useState(false);
   const go = async () => {
     setBusy(true);
     try {
@@ -1950,7 +1945,7 @@ const EditorsSection = () => {
 // SECTION: Analytics
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const AnalyticsSection = () => {
-  const [period, setPeriod] = useState('7d');
+  const [period, setPeriod] = React.useState('7d');
   const {
     data,
     loading
@@ -2307,10 +2302,10 @@ const SystemSection = () => {
 const AdminLogin = ({
   onAuth
 }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
   const submit = async e => {
     e.preventDefault();
     if (!email.trim() || !password) return;
@@ -2450,18 +2445,18 @@ const SourceBadge = ({
   }
 }, SOURCE_LABELS[source] || source);
 const ScraperSection = () => {
-  const [view, setView] = useState('books'); // 'books' | 'runs'
-  const [filters, setFilters] = useState({
+  const [view, setView] = React.useState('books'); // 'books' | 'runs'
+  const [filters, setFilters] = React.useState({
     source: '',
     status: '',
     search: '',
     page: 1
   });
-  const [selected, setSelected] = useState(new Set());
-  const [modal, setModal] = useState(null); // 'import-bulk' | { type: 'import', book } | 'trigger'
-  const [scraping, setScraping] = useState(null); // source name while scraping
-  const [searchInput, setSearchInput] = useState('');
-  const debounceRef = useRef(null);
+  const [selected, setSelected] = React.useState(new Set());
+  const [modal, setModal] = React.useState(null); // 'import-bulk' | { type: 'import', book } | 'trigger'
+  const [scraping, setScraping] = React.useState(null); // source name while scraping
+  const [searchInput, setSearchInput] = React.useState('');
+  const debounceRef = React.useRef(null);
   const {
     data: statusData,
     refresh: refreshStatus
@@ -2913,10 +2908,10 @@ const ImportScrapedModal = ({
   onClose,
   onDone
 }) => {
-  const [editor, setEditor] = useState('Mira Okafor');
-  const [genre, setGenre] = useState(book.genre || 'Fiction');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [editor, setEditor] = React.useState('Mira Okafor');
+  const [genre, setGenre] = React.useState(book.genre || 'Fiction');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
   const go = async () => {
     setBusy(true);
     setMsg('');
@@ -3003,10 +2998,10 @@ const ImportBulkModal = ({
   onClose,
   onDone
 }) => {
-  const [editor, setEditor] = useState('Mira Okafor');
-  const [genre, setGenre] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
+  const [editor, setEditor] = React.useState('Mira Okafor');
+  const [genre, setGenre] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [result, setResult] = React.useState(null);
   const go = async () => {
     setBusy(true);
     try {
@@ -3085,7 +3080,7 @@ const ImportBulkModal = ({
   }, "Cancel"))));
 };
 const ScraperRunsView = () => {
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = React.useState({
     source: '',
     page: 1
   });
@@ -3199,8 +3194,8 @@ const DuplicatesSection = () => {
     loading,
     refresh
   } = useAdminApi(() => AdminClient.getDuplicates());
-  const [merging, setMerging] = useState(null);
-  const [message, setMessage] = useState(null);
+  const [merging, setMerging] = React.useState(null);
+  const [message, setMessage] = React.useState(null);
   const handleMerge = async group => {
     // Auto-pick best book: highest status priority, then highest rating, then newest
     const sorted = [...group.books].sort((a, b) => {
@@ -3460,7 +3455,7 @@ const CompetitorSection = () => {
     loading,
     refresh
   } = useAdminApi(() => AdminClient.getCompetitorInsights());
-  const [scraping, setScraping] = useState(null);
+  const [scraping, setScraping] = React.useState(null);
   const handleScrape = async source => {
     setScraping(source);
     try {
@@ -3660,9 +3655,9 @@ const SECTIONS = [{
 const Admin = ({
   setRoute
 }) => {
-  const [authed, setAuthed] = useState(!!AdminClient.getToken());
-  const [section, setSection] = useState('overview');
-  const [sectionParams, setSectionParams] = useState({});
+  const [authed, setAuthed] = React.useState(!!AdminClient.getToken());
+  const [section, setSection] = React.useState('overview');
+  const [sectionParams, setSectionParams] = React.useState({});
   const navigate = (sec, params = {}) => {
     setSectionParams(params);
     setSection(sec);

@@ -1,8 +1,4 @@
 // AI-powered book recommendation engine with step-by-step questionnaire
-const {
-  useState,
-  useCallback
-} = React;
 
 // ── Constants ──
 
@@ -1076,28 +1072,28 @@ const Recommend = ({
   density
 }) => {
   const pad = density === 'compact' ? 20 : 32;
-  const [step, setStep] = useState(0);
-  const [stepKey, setStepKey] = useState(0);
-  const [profile, setProfile] = useState({
+  const [step, setStep] = React.useState(0);
+  const [stepKey, setStepKey] = React.useState(0);
+  const [profile, setProfile] = React.useState({
     ageRange: null,
     moods: [],
     genres: [],
     paceRange: null,
     freeText: ''
   });
-  const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const advance = useCallback(() => {
+  const [results, setResults] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const advance = React.useCallback(() => {
     setStepKey(k => k + 1);
     setStep(s => s + 1);
   }, []);
-  const updateProfile = useCallback((key, value) => {
+  const updateProfile = React.useCallback((key, value) => {
     setProfile(p => ({
       ...p,
       [key]: value
     }));
   }, []);
-  const toggleArray = useCallback((key, value, max) => {
+  const toggleArray = React.useCallback((key, value, max) => {
     setProfile(p => {
       const arr = p[key];
       if (arr.includes(value)) return {
@@ -1111,7 +1107,7 @@ const Recommend = ({
       };
     });
   }, []);
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = React.useCallback(async () => {
     setLoading(true);
     advance();
     try {
@@ -1123,7 +1119,7 @@ const Recommend = ({
       setLoading(false);
     }
   }, [profile, advance]);
-  const restart = useCallback(() => {
+  const restart = React.useCallback(() => {
     setStep(0);
     setStepKey(k => k + 1);
     setProfile({

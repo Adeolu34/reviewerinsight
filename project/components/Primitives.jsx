@@ -1,10 +1,9 @@
 // Shared small bits: Star, Eyebrow, Rule, GenreTag, Seal + scroll-reveal hook
-const { useState, useCallback } = React;
 
 // Scroll-triggered reveal hook
 const useReveal = (options = {}) => {
-  const [visible, setVisible] = useState(false);
-  const ref = useCallback(el => {
+  const [visible, setVisible] = React.useState(false);
+  const ref = React.useCallback(el => {
     if (!el) return;
     const obs = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) { setVisible(true); obs.unobserve(el); }
@@ -64,18 +63,18 @@ const Seal = ({ children, color = "#E8432C", rotate = -8, size = 96 }) => (
 
 // Enhanced Header with glassmorphism
 const Header = ({ route, setRoute, accent, dark }) => {
-  const [scrolled, setScrolled] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchRef = useRef(null);
+  const [scrolled, setScrolled] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const searchRef = React.useRef(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Sync search input with route (clear when navigating away from search)
-  useEffect(() => {
+  React.useEffect(() => {
     if (route.name !== 'browse' || !route.search) {
       setSearchQuery('');
     }

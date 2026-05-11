@@ -1,6 +1,4 @@
-const { useState, useEffect, useCallback } = React;
-
-// URL ↔ Route helpers
+// URL ↔ Route helpers (React.* hooks — safe across multiple classic <script> tags)
 function routeToPath(r) {
   if (!r) return '/';
   switch (r.name) {
@@ -32,17 +30,17 @@ function pathToRoute(pathname) {
 }
 
 function App() {
-  const [route, setRouteState] = useState(() => {
+  const [route, setRouteState] = React.useState(() => {
     try {
       return pathToRoute(window.location.pathname);
     } catch {
       return { name: 'home' };
     }
   });
-  const [tweaks, setTweaks] = useState(window.TWEAK_DEFAULTS);
-  const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [tweaks, setTweaks] = React.useState(window.TWEAK_DEFAULTS);
+  const [tweaksOpen, setTweaksOpen] = React.useState(false);
 
-  const setRoute = useCallback((r) => {
+  const setRoute = React.useCallback((r) => {
     const newRoute = typeof r === 'string' ? { name: r } : r;
     const newPath = routeToPath(newRoute);
     if (window.location.pathname !== newPath) {
@@ -52,18 +50,18 @@ function App() {
   }, []);
 
   // Browser back/forward
-  useEffect(() => {
+  React.useEffect(() => {
     const onPopState = () => setRouteState(pathToRoute(window.location.pathname));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     window.scrollTo(0, 0);
   }, [route]);
 
   // Tweaks protocol
-  useEffect(() => {
+  React.useEffect(() => {
     const onMsg = (e) => {
       if (!e.data || typeof e.data !== 'object') return;
       if (e.data.type === '__activate_edit_mode') setTweaksOpen(true);

@@ -1,6 +1,5 @@
 // ─── Admin Dashboard for Reviewer Insight ──────────────────────
 // Dark-themed control panel: overview, agents, books, editors, analytics, system
-const { useState, useEffect, useRef, useCallback } = React;
 
 const T = {
   bg: '#0F0F0F', card: '#1A1A1A', hover: '#252525', border: '#333',
@@ -155,10 +154,10 @@ const Label = ({ children }) => (
 
 // ─── useAdminApi hook ───────────────────────────────────────────
 function useAdminApi(fetchFn, deps = []) {
-  const [state, setState] = useState({ data: null, loading: true, error: null });
-  const [tick, setTick] = useState(0);
+  const [state, setState] = React.useState({ data: null, loading: true, error: null });
+  const [tick, setTick] = React.useState(0);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let cancelled = false;
     setState(prev => ({ ...prev, loading: true, error: null }));
     fetchFn()
@@ -298,9 +297,9 @@ const OverviewSection = ({ navigate }) => {
 // SECTION: Agent Runs
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const RunsSection = () => {
-  const [filters, setFilters] = useState({ editor: '', status: '', page: 1 });
-  const [modal, setModal] = useState(null); // 'trigger' or run object
-  const [backfillMsg, setBackfillMsg] = useState('');
+  const [filters, setFilters] = React.useState({ editor: '', status: '', page: 1 });
+  const [modal, setModal] = React.useState(null); // 'trigger' or run object
+  const [backfillMsg, setBackfillMsg] = React.useState('');
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getRuns(filters), [filters]);
 
   const triggerBackfill = async () => {
@@ -407,10 +406,10 @@ const RunsSection = () => {
 };
 
 const TriggerModal = ({ onClose, onDone }) => {
-  const [editor, setEditor] = useState('Mira Okafor');
-  const [batch, setBatch] = useState('8');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [editor, setEditor] = React.useState('Mira Okafor');
+  const [batch, setBatch] = React.useState('8');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
 
   const go = async () => {
     setBusy(true); setMsg('');
@@ -457,14 +456,14 @@ const guessGenre = (categories = []) => {
 };
 
 const SearchImportModal = ({ onClose, onImported }) => {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [searchErr, setSearchErr] = useState('');
-  const [importing, setImporting] = useState({});
-  const [imported, setImported] = useState({});
-  const [genres, setGenres] = useState({});
-  const debounceRef = useRef(null);
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState([]);
+  const [searching, setSearching] = React.useState(false);
+  const [searchErr, setSearchErr] = React.useState('');
+  const [importing, setImporting] = React.useState({});
+  const [imported, setImported] = React.useState({});
+  const [genres, setGenres] = React.useState({});
+  const debounceRef = React.useRef(null);
 
   const doSearch = async (q) => {
     if (q.trim().length < 2) { setResults([]); return; }
@@ -588,11 +587,11 @@ const SearchImportModal = ({ onClose, onImported }) => {
 };
 
 const BooksSection = ({ params = {} }) => {
-  const [filters, setFilters] = useState({ status: params.status || '', genre: params.genre || '', editor: params.editor || '', search: '', page: 1 });
-  const [modal, setModal] = useState(null); // { type, book }
-  const [showSearchImport, setShowSearchImport] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
-  const debounceRef = useRef(null);
+  const [filters, setFilters] = React.useState({ status: params.status || '', genre: params.genre || '', editor: params.editor || '', search: '', page: 1 });
+  const [modal, setModal] = React.useState(null); // { type, book }
+  const [showSearchImport, setShowSearchImport] = React.useState(false);
+  const [searchInput, setSearchInput] = React.useState('');
+  const debounceRef = React.useRef(null);
 
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getAdminBooks(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
@@ -691,13 +690,13 @@ const BooksSection = ({ params = {} }) => {
 };
 
 const EditBookModal = ({ book, onClose, onDone }) => {
-  const [status, setStatus] = useState(book.status);
-  const [rating, setRating] = useState(String(book.rating || ''));
-  const [editor, setEditor] = useState(book.editor || '');
-  const [genre, setGenre] = useState(book.genre || '');
-  const [featured, setFeatured] = useState(!!book.featured);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [status, setStatus] = React.useState(book.status);
+  const [rating, setRating] = React.useState(String(book.rating || ''));
+  const [editor, setEditor] = React.useState(book.editor || '');
+  const [genre, setGenre] = React.useState(book.genre || '');
+  const [featured, setFeatured] = React.useState(!!book.featured);
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
 
   const save = async () => {
     setBusy(true);
@@ -740,8 +739,8 @@ const EditBookModal = ({ book, onClose, onDone }) => {
 };
 
 const DeleteBookModal = ({ book, onClose, onDone }) => {
-  const [hard, setHard] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [hard, setHard] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
 
   const go = async () => {
     setBusy(true);
@@ -774,8 +773,8 @@ const DeleteBookModal = ({ book, onClose, onDone }) => {
 };
 
 const RetryBookModal = ({ book, onClose, onDone }) => {
-  const [step, setStep] = useState('review');
-  const [busy, setBusy] = useState(false);
+  const [step, setStep] = React.useState('review');
+  const [busy, setBusy] = React.useState(false);
 
   const go = async () => {
     setBusy(true);
@@ -846,7 +845,7 @@ const EditorsSection = () => {
 // SECTION: Analytics
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const AnalyticsSection = () => {
-  const [period, setPeriod] = useState('7d');
+  const [period, setPeriod] = React.useState('7d');
   const { data, loading } = useAdminApi(() => AdminClient.getAnalytics(period), [period]);
 
   if (loading) return <div style={{ color: T.muted, fontFamily: T.mono, padding: 40, textAlign: 'center' }}>Loading...</div>;
@@ -1027,10 +1026,10 @@ const SystemSection = () => {
 // LOGIN + MAIN SHELL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const AdminLogin = ({ onAuth }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1080,13 +1079,13 @@ const SourceBadge = ({ source }) => (
 );
 
 const ScraperSection = () => {
-  const [view, setView] = useState('books'); // 'books' | 'runs'
-  const [filters, setFilters] = useState({ source: '', status: '', search: '', page: 1 });
-  const [selected, setSelected] = useState(new Set());
-  const [modal, setModal] = useState(null); // 'import-bulk' | { type: 'import', book } | 'trigger'
-  const [scraping, setScraping] = useState(null); // source name while scraping
-  const [searchInput, setSearchInput] = useState('');
-  const debounceRef = useRef(null);
+  const [view, setView] = React.useState('books'); // 'books' | 'runs'
+  const [filters, setFilters] = React.useState({ source: '', status: '', search: '', page: 1 });
+  const [selected, setSelected] = React.useState(new Set());
+  const [modal, setModal] = React.useState(null); // 'import-bulk' | { type: 'import', book } | 'trigger'
+  const [scraping, setScraping] = React.useState(null); // source name while scraping
+  const [searchInput, setSearchInput] = React.useState('');
+  const debounceRef = React.useRef(null);
 
   const { data: statusData, refresh: refreshStatus } = useAdminApi(() => AdminClient.getScraperStatus());
   const { data, loading, refresh } = useAdminApi(
@@ -1301,10 +1300,10 @@ const ScraperSection = () => {
 };
 
 const ImportScrapedModal = ({ book, onClose, onDone }) => {
-  const [editor, setEditor] = useState('Mira Okafor');
-  const [genre, setGenre] = useState(book.genre || 'Fiction');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [editor, setEditor] = React.useState('Mira Okafor');
+  const [genre, setGenre] = React.useState(book.genre || 'Fiction');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
 
   const go = async () => {
     setBusy(true); setMsg('');
@@ -1351,10 +1350,10 @@ const ImportScrapedModal = ({ book, onClose, onDone }) => {
 };
 
 const ImportBulkModal = ({ ids, onClose, onDone }) => {
-  const [editor, setEditor] = useState('Mira Okafor');
-  const [genre, setGenre] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
+  const [editor, setEditor] = React.useState('Mira Okafor');
+  const [genre, setGenre] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [result, setResult] = React.useState(null);
 
   const go = async () => {
     setBusy(true);
@@ -1406,7 +1405,7 @@ const ImportBulkModal = ({ ids, onClose, onDone }) => {
 };
 
 const ScraperRunsView = () => {
-  const [filters, setFilters] = useState({ source: '', page: 1 });
+  const [filters, setFilters] = React.useState({ source: '', page: 1 });
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getScraperRuns(filters), [filters]);
 
   return (
@@ -1448,8 +1447,8 @@ const STATUS_PRIORITY = ['published', 'review_complete', 'review_pending', 'meta
 
 const DuplicatesSection = () => {
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getDuplicates());
-  const [merging, setMerging] = useState(null);
-  const [message, setMessage] = useState(null);
+  const [merging, setMerging] = React.useState(null);
+  const [message, setMessage] = React.useState(null);
 
   const handleMerge = async (group) => {
     // Auto-pick best book: highest status priority, then highest rating, then newest
@@ -1588,7 +1587,7 @@ const TYPE_COLOR = { editorial: '#8B5CF6', professional: '#3B82F6', bestseller: 
 
 const CompetitorSection = () => {
   const { data, loading, refresh } = useAdminApi(() => AdminClient.getCompetitorInsights());
-  const [scraping, setScraping] = useState(null);
+  const [scraping, setScraping] = React.useState(null);
 
   const handleScrape = async (source) => {
     setScraping(source);
@@ -1680,9 +1679,9 @@ const SECTIONS = [
 ];
 
 const Admin = ({ setRoute }) => {
-  const [authed, setAuthed] = useState(!!AdminClient.getToken());
-  const [section, setSection] = useState('overview');
-  const [sectionParams, setSectionParams] = useState({});
+  const [authed, setAuthed] = React.useState(!!AdminClient.getToken());
+  const [section, setSection] = React.useState('overview');
+  const [sectionParams, setSectionParams] = React.useState({});
 
   const navigate = (sec, params = {}) => {
     setSectionParams(params);
