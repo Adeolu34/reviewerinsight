@@ -24,6 +24,10 @@
 <style>
   html, body { margin: 0; padding: 0; background: #F5EFE4; color: #141210; font-family: "Space Grotesk", sans-serif; scroll-behavior: smooth; }
   *, *::before, *::after { box-sizing: border-box; }
+  /* Pre-hydration book HTML: visible in #root until React mounts (avoid display:none on main text — bad indexing signal). */
+  .ri-seo-prerender { padding: 28px 32px 56px; max-width: 720px; margin: 0 auto; font: 400 17px/1.65 "Space Grotesk", sans-serif; color: #141210; background: #F5EFE4; }
+  .ri-seo-prerender h1 { font: 700 2rem/1.15 "DM Serif Display", Georgia, serif; margin: 0 0 12px; }
+  .ri-seo-prerender h2, .ri-seo-prerender h3 { font-family: "DM Serif Display", Georgia, serif; }
   button { font-family: inherit; }
   ::selection { background: rgba(232,67,44,.25); color: #141210; }
 

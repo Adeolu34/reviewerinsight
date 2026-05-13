@@ -1,8 +1,9 @@
 const path = require('path');
 const fs = require('fs');
 const Book = require('../models/Book');
+const config = require('../config/env');
 
-const SITE_URL = 'https://reviewerinsight.com';
+const SITE_URL = config.siteUrl;
 const SITE_NAME = 'Reviewer Insight';
 const TWITTER_HANDLE = '@ReviewerInsight';
 const DEFAULT_OG_IMAGE = `${SITE_URL}/og-default.png`;
@@ -325,7 +326,7 @@ function buildSeoContent(book, canonical, relatedBooks = []) {
     book.genre ? `<p><a href="${SITE_URL}/browse?genre=${encodeURIComponent(book.genre)}">Browse all ${escHtml(book.genre)} reviews</a></p>` : '',
   ].filter(Boolean).join('\n');
 
-  return `<article itemscope itemtype="https://schema.org/Review" style="display:none" aria-hidden="true">
+  return `<article class="ri-seo-prerender" itemscope itemtype="https://schema.org/Review">
   <h1 itemprop="name">${escHtml(book.title)}</h1>
   <p>by <span itemprop="author">${escHtml(book.author)}</span>${book.year ? ` · ${book.year}` : ''}${book.pages ? ` · ${book.pages} pages` : ''}</p>
   ${book.genre ? `<p>Genre: ${escHtml(book.genre)}</p>` : ''}
@@ -354,9 +355,12 @@ function injectMeta(html, meta) {
     html = html.replace(/<title>[^<]*<\/title>/, `<title>${escHtml(meta.title)}</title>`);
   }
 
-  // Noindex
+  // Noindex (admin, etc.)
   if (meta.noindex) {
     tags.push('<meta name="robots" content="noindex, nofollow"/>');
+  } else if (meta.canonical) {
+    // Explicit indexing hints for public pages (helps avoid ambiguous crawler signals).
+    tags.push('<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"/>');
   }
 
   // Meta description
