@@ -15,19 +15,19 @@ class AgentOrchestrator {
 
   /**
    * Start scheduled agent runs.
-   * Schedule: All 4 editors run every 6 hours, staggered by 15 minutes.
-   *   :00 UTC — Mira Okafor  (50 books × 4 runs = 200/day)
-   *   :15 UTC — Jules Park   (50 books × 4 runs = 200/day)
-   *   :30 UTC — Dae Han      (50 books × 4 runs = 200/day)
-   *   :45 UTC — Noor Saleh   (50 books × 4 runs = 200/day)
-   * Total: ~800 books/day reviewed
+   * Schedule: All 4 editors run every 12 hours, staggered by 15 minutes.
+   *   :00 UTC — Mira Okafor  (20 books × 2 runs = 40/day)
+   *   :15 UTC — Jules Park   (20 books × 2 runs = 40/day)
+   *   :30 UTC — Dae Han      (20 books × 2 runs = 40/day)
+   *   :45 UTC — Noor Saleh   (20 books × 2 runs = 40/day)
+   * Total: ~160 books/day reviewed
    */
   startSchedule() {
     const schedule = [
-      { cron: '0 */6 * * *',  editor: 'Mira Okafor', batchSize: 50 },
-      { cron: '15 */6 * * *', editor: 'Jules Park',  batchSize: 50 },
-      { cron: '30 */6 * * *', editor: 'Dae Han',     batchSize: 50 },
-      { cron: '45 */6 * * *', editor: 'Noor Saleh',  batchSize: 50 },
+      { cron: '0 */12 * * *',  editor: 'Mira Okafor', batchSize: 20 },
+      { cron: '15 */12 * * *', editor: 'Jules Park',  batchSize: 20 },
+      { cron: '30 */12 * * *', editor: 'Dae Han',     batchSize: 20 },
+      { cron: '45 */12 * * *', editor: 'Noor Saleh',  batchSize: 20 },
     ];
 
     for (const { cron: cronExpr, editor, batchSize } of schedule) {
@@ -44,7 +44,7 @@ class AgentOrchestrator {
       logger.info(`Scheduled ${editor}: ${cronExpr} UTC (batch: ${batchSize})`);
     }
 
-    logger.info('Agent orchestrator started — 4 editors × every 6h × 50 books = ~800 books/day');
+    logger.info('Agent orchestrator started — 4 editors × every 12h × 20 books = ~160 books/day');
   }
 
   /**

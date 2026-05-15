@@ -3,6 +3,7 @@ const AgentRun = require('../models/AgentRun');
 const { discoverBooks } = require('../services/bookDiscovery');
 const { generateReview, generateChapterSummary } = require('../services/openaiReview');
 const { generateCoverDesign } = require('../services/coverResolver');
+const { isDuplicate } = require('../utils/dedup');
 const logger = require('../utils/logger');
 
 // Concurrent LLM requests — tuned for OpenRouter / provider rate limits.
@@ -48,7 +49,7 @@ async function generateAndSaveChapters(book, persona) {
  * @returns {string} AgentRun ID
  */
 async function runPipeline(persona, options = {}) {
-  const { batchSize = 50, backfill = false } = options;
+  const { batchSize = 20, backfill = false } = options;
   const currentYear = new Date().getFullYear();
 
   const run = await AgentRun.create({
@@ -89,6 +90,12 @@ async function runPipeline(persona, options = {}) {
 
         for (const bookData of discovered) {
           try {
+            const dup = await isDuplicate(bookData.title, bookData.author, bookData.isbn);
+            if (dup.isDup) {
+              run.booksSkipped += 1;
+              logger.debug(`Skipped duplicate: "${bookData.title}" (${dup.reason})`);
+              continue;
+            }
             const saved = await Book.create(bookData);
             booksToProcess.push(saved.toObject());
             run.booksDiscovered += 1;

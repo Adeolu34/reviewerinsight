@@ -161,7 +161,7 @@ async function generateChapterSummary(book, persona) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        { temperature: 0.7, max_tokens: 8192 },
+        { temperature: 0.7, max_tokens: 2000 },
       ),
     );
   }, { label: `LLM chapters: "${book.title}"`, maxAttempts: 2 });
