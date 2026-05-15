@@ -70,11 +70,11 @@ const Home = ({ setRoute, accent, density }) => {
               </div>
             </div>
             <div style={{ display:'flex', gap: 10, animation:'ri-fadeUp .6s .6s ease both' }}>
-              <button onClick={()=>setRoute({name:'review', id: featured.id})} className="ri-btn-primary" style={{
+              <button onClick={()=>setRoute(riReviewRouteFromBook(featured))} className="ri-btn-primary" style={{
                 font:'700 13px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
                 padding:'14px 22px', background:'#141210', color:'#F5EFE4', border:0, cursor:'pointer', borderRadius: 999
               }}>Read the review →</button>
-              <button onClick={()=>setRoute({name:'review', id: featured.id, tab:'summary'})} className="ri-btn-ghost" style={{
+              <button onClick={()=>setRoute(riReviewRouteFromBook(featured, { tab: 'summary' }))} className="ri-btn-ghost" style={{
                 font:'700 13px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em',
                 padding:'14px 22px', background:'transparent', color:'#141210', border:'1.5px solid #141210', cursor:'pointer', borderRadius: 999
               }}>Jump to 4-min summary</button>
@@ -151,7 +151,7 @@ const Home = ({ setRoute, accent, density }) => {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 36 }}>
           {featuredSide.map((b, i) => (
-            <article key={b.id} onClick={()=>setRoute({name:'review', id: b.id})} style={{
+            <article key={b.id} onClick={()=>setRoute(riReviewRouteFromBook(b))} style={{
               cursor:'pointer', display:'flex', flexDirection:'column',
               opacity: featVis ? 1 : 0,
               transform: featVis ? 'translateY(0)' : 'translateY(40px)',
@@ -279,7 +279,7 @@ const Home = ({ setRoute, accent, density }) => {
 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap: 28, rowGap: 40 }}>
           {latest.map((b, idx) => (
-            <div key={b.id} onClick={()=>setRoute({name:'review', id: b.id})} style={{
+            <div key={b.id} onClick={()=>setRoute(riReviewRouteFromBook(b))} style={{
               cursor:'pointer',
               opacity: catVis ? 1 : 0,
               transform: catVis ? 'translateY(0)' : 'translateY(28px)',

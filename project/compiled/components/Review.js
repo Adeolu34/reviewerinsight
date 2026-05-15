@@ -509,10 +509,7 @@ const Review = ({
   }, related.map((b, idx) => /*#__PURE__*/React.createElement("div", {
     key: b.id,
     onClick: () => {
-      setRoute({
-        name: 'review',
-        id: b.id
-      });
+      setRoute(riReviewRouteFromBook(b));
       window.scrollTo(0, 0);
     },
     style: {
@@ -786,10 +783,7 @@ const ReviewBody = ({
   }, window.BOOKS.filter(b => b.editor === (book.editor || 'Mira Okafor') && b.id !== book.id).slice(0, 3).map(b => /*#__PURE__*/React.createElement("div", {
     key: b.id,
     onClick: () => {
-      setRoute({
-        name: 'review',
-        id: b.id
-      });
+      setRoute(riReviewRouteFromBook(b));
       window.scrollTo(0, 0);
     },
     style: {

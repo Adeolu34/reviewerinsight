@@ -10,7 +10,9 @@ function routeToPath(r) {
     case 'admin': return '/reviewadmin';
     case 'review': {
       const id = r.id || '';
-      return `/book/${id}`;
+      const slug = (r.slug || '').replace(/^\/+|\/+$/g, '');
+      if (!id) return '/';
+      return slug ? `/book/${id}/${slug}` : `/book/${id}`;
     }
     default: return '/';
   }
@@ -24,8 +26,18 @@ function pathToRoute(pathname) {
   if (p === '/editors') return { name: 'editors' };
   if (p === '/membership') return { name: 'membership' };
   if (p === '/reviewadmin') return { name: 'admin' };
-  const bookMatch = p.match(/^\/book\/([a-f0-9]+)/i);
-  if (bookMatch) return { name: 'review', id: bookMatch[1] };
+  const bookMatch = p.match(/^\/book\/([a-f0-9]{24})(?:\/([^/?#]+))?/i);
+  if (bookMatch) {
+    const out = { name: 'review', id: bookMatch[1] };
+    if (bookMatch[2]) {
+      try {
+        out.slug = decodeURIComponent(bookMatch[2]);
+      } catch (_) {
+        out.slug = bookMatch[2];
+      }
+    }
+    return out;
+  }
   return { name: 'home' };
 }
 
@@ -111,8 +123,8 @@ function App() {
         </div>
         <label>Jump to</label>
         <div className="seg">
-          {[['home', 'Home'], ['browse', 'Browse'], ['recommend', 'For You'], ['review', 'Review'], ['membership', 'Member']].map(([k, lab]) => (
-            <button key={k} onClick={() => setRoute(k === 'review' ? { name: 'review', id: 1 } : { name: k })}>{lab}</button>
+          {[['home', 'Home'], ['browse', 'Browse'], ['recommend', 'For You'], ['editors', 'Editors'], ['membership', 'Member']].map(([k, lab]) => (
+            <button key={k} onClick={() => setRoute({ name: k })}>{lab}</button>
           ))}
         </div>
       </div>

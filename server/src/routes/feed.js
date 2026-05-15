@@ -22,9 +22,7 @@ function escXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-function slugify(str) {
-  return (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
+const { slugify } = require('../utils/slugify');
 
 // Wrap HTML content safely in CDATA for <content:encoded>
 function cdata(str) {
@@ -86,7 +84,7 @@ async function generateFeed() {
   xml += `  </image>\n`;
 
   for (const book of books) {
-    const slug = slugify(book.title);
+    const slug = slugify(book.title) || 'book';
     const bookUrl = `${SITE_URL}/book/${book._id}/${slug}`;
     const pubDate = book.updatedAt
       ? new Date(book.updatedAt).toUTCString()

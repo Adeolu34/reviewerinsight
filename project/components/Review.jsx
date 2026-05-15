@@ -214,7 +214,7 @@ const Review = ({ bookId, initialTab, setRoute, accent, density }) => {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 32 }}>
           {related.map((b, idx) => (
-            <div key={b.id} onClick={()=>{ setRoute({name:'review', id: b.id}); window.scrollTo(0,0); }} style={{
+            <div key={b.id} onClick={()=>{ setRoute(riReviewRouteFromBook(b)); window.scrollTo(0,0); }} style={{
               cursor:'pointer',
               opacity: relVis ? 1 : 0,
               transform: relVis ? 'translateY(0)' : 'translateY(28px)',
@@ -314,7 +314,7 @@ const ReviewBody = ({ book, RB, accent, pad }) => {
         <Eyebrow color={accent}>Also from this editor</Eyebrow>
         <div style={{ marginTop: 12, display:'flex', flexDirection:'column', gap: 14 }}>
           {window.BOOKS.filter(b => b.editor === (book.editor || 'Mira Okafor') && b.id !== book.id).slice(0,3).map(b=>(
-            <div key={b.id} onClick={()=>{ setRoute({name:'review', id: b.id}); window.scrollTo(0,0); }} style={{ display:'flex', gap: 10, cursor:'pointer', transition:'transform .2s ease' }} className="ri-card">
+            <div key={b.id} onClick={()=>{ setRoute(riReviewRouteFromBook(b)); window.scrollTo(0,0); }} style={{ display:'flex', gap: 10, cursor:'pointer', transition:'transform .2s ease' }} className="ri-card">
               <Cover book={b} size="xs"/>
               <div>
                 <div style={{ font:'700 14px/1.15 "DM Serif Display", Georgia, serif' }}>{b.title}</div>

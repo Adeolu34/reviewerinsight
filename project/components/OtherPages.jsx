@@ -62,7 +62,7 @@ const Editors = ({ setRoute, accent, density }) => {
                 <p style={{ font:'400 15px/1.55 "Space Grotesk", sans-serif', margin:'0 0 16px' }}>{e.beat}. {books.length > 0 ? `Recent bylines include ${books.map(b=>b.title).slice(0,2).join(' and ')}.` : 'Edits incoming.'}</p>
                 {books.length > 0 && (
                   <div style={{ display:'flex', gap: 8 }}>
-                    {books.map(b => <div key={b.id} onClick={()=>setRoute({name:'review', id: b.id})} style={{ cursor:'pointer' }} className="ri-card"><Cover book={b} size="xs"/></div>)}
+                    {books.map(b => <div key={b.id} onClick={()=>setRoute(riReviewRouteFromBook(b))} style={{ cursor:'pointer' }} className="ri-card"><Cover book={b} size="xs"/></div>)}
                   </div>
                 )}
               </div>

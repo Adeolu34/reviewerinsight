@@ -150,10 +150,7 @@ const Home = ({
       animation: 'ri-fadeUp .6s .6s ease both'
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setRoute({
-      name: 'review',
-      id: featured.id
-    }),
+    onClick: () => setRoute(riReviewRouteFromBook(featured)),
     className: "ri-btn-primary",
     style: {
       font: '700 13px "JetBrains Mono", monospace',
@@ -167,11 +164,9 @@ const Home = ({
       borderRadius: 999
     }
   }, "Read the review \u2192"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setRoute({
-      name: 'review',
-      id: featured.id,
+    onClick: () => setRoute(riReviewRouteFromBook(featured, {
       tab: 'summary'
-    }),
+    })),
     className: "ri-btn-ghost",
     style: {
       font: '700 13px "JetBrains Mono", monospace',
@@ -323,10 +318,7 @@ const Home = ({
     }
   }, featuredSide.map((b, i) => /*#__PURE__*/React.createElement("article", {
     key: b.id,
-    onClick: () => setRoute({
-      name: 'review',
-      id: b.id
-    }),
+    onClick: () => setRoute(riReviewRouteFromBook(b)),
     style: {
       cursor: 'pointer',
       display: 'flex',
@@ -632,10 +624,7 @@ const Home = ({
     }
   }, latest.map((b, idx) => /*#__PURE__*/React.createElement("div", {
     key: b.id,
-    onClick: () => setRoute({
-      name: 'review',
-      id: b.id
-    }),
+    onClick: () => setRoute(riReviewRouteFromBook(b)),
     style: {
       cursor: 'pointer',
       opacity: catVis ? 1 : 0,

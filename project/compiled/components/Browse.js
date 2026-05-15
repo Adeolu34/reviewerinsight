@@ -261,10 +261,7 @@ const Browse = ({
     }
   }, list.map((b, idx) => /*#__PURE__*/React.createElement("div", {
     key: b.id,
-    onClick: () => setRoute({
-      name: 'review',
-      id: b.id
-    }),
+    onClick: () => setRoute(riReviewRouteFromBook(b)),
     style: {
       cursor: 'pointer',
       animation: `ri-fadeUp .5s ${Math.min(idx * .04, .5)}s cubic-bezier(.2,.8,.2,1) both`
@@ -302,10 +299,7 @@ const Browse = ({
     key: animKey
   }, list.map((b, i) => /*#__PURE__*/React.createElement("div", {
     key: b.id,
-    onClick: () => setRoute({
-      name: 'review',
-      id: b.id
-    }),
+    onClick: () => setRoute(riReviewRouteFromBook(b)),
     style: {
       display: 'grid',
       gridTemplateColumns: '60px 100px 1fr auto auto',

@@ -18,7 +18,9 @@ function routeToPath(r) {
     case 'review':
       {
         const id = r.id || '';
-        return `/book/${id}`;
+        const slug = (r.slug || '').replace(/^\/+|\/+$/g, '');
+        if (!id) return '/';
+        return slug ? `/book/${id}/${slug}` : `/book/${id}`;
       }
     default:
       return '/';
@@ -44,11 +46,21 @@ function pathToRoute(pathname) {
   if (p === '/reviewadmin') return {
     name: 'admin'
   };
-  const bookMatch = p.match(/^\/book\/([a-f0-9]+)/i);
-  if (bookMatch) return {
-    name: 'review',
-    id: bookMatch[1]
-  };
+  const bookMatch = p.match(/^\/book\/([a-f0-9]{24})(?:\/([^/?#]+))?/i);
+  if (bookMatch) {
+    const out = {
+      name: 'review',
+      id: bookMatch[1]
+    };
+    if (bookMatch[2]) {
+      try {
+        out.slug = decodeURIComponent(bookMatch[2]);
+      } catch (_) {
+        out.slug = bookMatch[2];
+      }
+    }
+    return out;
+  }
   return {
     name: 'home'
   };
@@ -159,12 +171,9 @@ function App() {
     onClick: () => updateTweak('density', d)
   }, d))), /*#__PURE__*/React.createElement("label", null, "Jump to"), /*#__PURE__*/React.createElement("div", {
     className: "seg"
-  }, [['home', 'Home'], ['browse', 'Browse'], ['recommend', 'For You'], ['review', 'Review'], ['membership', 'Member']].map(([k, lab]) => /*#__PURE__*/React.createElement("button", {
+  }, [['home', 'Home'], ['browse', 'Browse'], ['recommend', 'For You'], ['editors', 'Editors'], ['membership', 'Member']].map(([k, lab]) => /*#__PURE__*/React.createElement("button", {
     key: k,
-    onClick: () => setRoute(k === 'review' ? {
-      name: 'review',
-      id: 1
-    } : {
+    onClick: () => setRoute({
       name: k
     })
   }, lab)))));

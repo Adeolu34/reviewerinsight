@@ -21,6 +21,7 @@ const recommendationsRouter = require('./routes/recommendations');
 const trendingRouter = require('./routes/trending');
 const sitemapRouter = require('./routes/sitemap');
 const feedRouter = require('./routes/feed');
+const bookCanonicalRouter = require('./routes/bookCanonical');
 const seoMiddleware = require('./middleware/seoMiddleware');
 
 async function startServer() {
@@ -41,6 +42,7 @@ async function startServer() {
   // Sitemap + RSS before static — ensures /sitemap.xml and /feed.xml are always dynamic XML, not a missing static file or HTML fallback.
   app.use(sitemapRouter);
   app.use(feedRouter);
+  app.use(bookCanonicalRouter);
 
   // Serve the frontend static files
   app.use(express.static(path.join(__dirname, '../../project')));

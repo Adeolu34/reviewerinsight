@@ -264,7 +264,7 @@ const RecommendationCard = ({ rec, index, setRoute, accent }) => {
       borderBottom: '1px solid rgba(20,18,16,0.15)',
       animation: `ri-fadeUp .6s ${index * 0.12}s cubic-bezier(.2,.8,.2,1) both`,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }} onClick={() => setRoute({ name: 'review', id: rec.bookId })}>
+      <div style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }} onClick={() => setRoute(riReviewRouteFromBook({ bookId: rec.bookId, title: rec.title }))}>
         <Cover book={book} size="sm" />
       </div>
       <div>
@@ -276,7 +276,7 @@ const RecommendationCard = ({ rec, index, setRoute, accent }) => {
           }}>{confidence}% Match</div>
         </div>
         <h3 style={{ font: '700 28px/1.08 "DM Serif Display", Georgia, serif', margin: '0 0 4px', letterSpacing: '-.01em', cursor: 'pointer' }}
-          onClick={() => setRoute({ name: 'review', id: rec.bookId })}>{rec.title}</h3>
+          onClick={() => setRoute(riReviewRouteFromBook({ bookId: rec.bookId, title: rec.title }))}>{rec.title}</h3>
         <div style={{ font: '600 12px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', opacity: .7, marginBottom: 12 }}>{rec.author}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
           <Stars value={rec.rating || 0} size={13} />
@@ -291,7 +291,7 @@ const RecommendationCard = ({ rec, index, setRoute, accent }) => {
             }}>{tag}</span>
           ))}
         </div>
-        <button onClick={() => setRoute({ name: 'review', id: rec.bookId })} className="ri-btn-ghost" style={{
+        <button onClick={() => setRoute(riReviewRouteFromBook({ bookId: rec.bookId, title: rec.title }))} className="ri-btn-ghost" style={{
           font: '700 11px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em',
           padding: '10px 16px', border: '1.5px solid #141210', background: 'transparent', cursor: 'pointer', borderRadius: 999,
         }}>Read Review →</button>

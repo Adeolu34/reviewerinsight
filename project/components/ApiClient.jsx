@@ -258,4 +258,17 @@ const AdminClient = {
   },
 };
 
-Object.assign(window, { ApiClient, AdminClient, useApi, checkApiAvailable, normalizeBook });
+/** URL slug + review route (must match server `utils/slugify` and sitemap /book/:id/:slug). */
+function riSlugify(str) {
+  return (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+function riReviewRouteFromBook(book, extra = {}) {
+  if (!book) return { name: 'home' };
+  const id = book.id != null ? String(book.id) : (book._id != null ? String(book._id) : (book.bookId != null ? String(book.bookId) : ''));
+  if (!id) return { name: 'home' };
+  const title = book.title != null ? String(book.title) : '';
+  const slug = title ? riSlugify(title) : '';
+  return { name: 'review', id, ...(slug ? { slug } : {}), ...extra };
+}
+
+Object.assign(window, { ApiClient, AdminClient, useApi, checkApiAvailable, normalizeBook, riSlugify, riReviewRouteFromBook });

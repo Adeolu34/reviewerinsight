@@ -138,7 +138,7 @@ const Browse = ({ setRoute, route, accent, density }) => {
       {view==='grid' ? (
         <div key={animKey} style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap: 32, rowGap: 48 }}>
           {list.map((b, idx) => (
-            <div key={b.id} onClick={()=>setRoute({name:'review', id: b.id})} style={{
+            <div key={b.id} onClick={()=>setRoute(riReviewRouteFromBook(b))} style={{
               cursor:'pointer',
               animation: `ri-fadeUp .5s ${Math.min(idx * .04, .5)}s cubic-bezier(.2,.8,.2,1) both`
             }} className="ri-card">
@@ -153,7 +153,7 @@ const Browse = ({ setRoute, route, accent, density }) => {
       ) : (
         <div key={animKey}>
           {list.map((b, i) => (
-            <div key={b.id} onClick={()=>setRoute({name:'review', id: b.id})} style={{
+            <div key={b.id} onClick={()=>setRoute(riReviewRouteFromBook(b))} style={{
               display:'grid', gridTemplateColumns:'60px 100px 1fr auto auto', gap: 24, alignItems:'center', padding:'20px 0', borderBottom:'1px solid rgba(20,18,16,0.15)', cursor:'pointer',
               animation: `ri-fadeUp .4s ${Math.min(i * .03, .4)}s cubic-bezier(.2,.8,.2,1) both`
             }} className="ri-row">

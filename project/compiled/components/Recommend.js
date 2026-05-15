@@ -630,10 +630,10 @@ const RecommendationCard = ({
       justifyContent: 'center',
       cursor: 'pointer'
     },
-    onClick: () => setRoute({
-      name: 'review',
-      id: rec.bookId
-    })
+    onClick: () => setRoute(riReviewRouteFromBook({
+      bookId: rec.bookId,
+      title: rec.title
+    }))
   }, /*#__PURE__*/React.createElement(Cover, {
     book: book,
     size: "sm"
@@ -662,10 +662,10 @@ const RecommendationCard = ({
       letterSpacing: '-.01em',
       cursor: 'pointer'
     },
-    onClick: () => setRoute({
-      name: 'review',
-      id: rec.bookId
-    })
+    onClick: () => setRoute(riReviewRouteFromBook({
+      bookId: rec.bookId,
+      title: rec.title
+    }))
   }, rec.title), /*#__PURE__*/React.createElement("div", {
     style: {
       font: '600 12px "JetBrains Mono", monospace',
@@ -717,10 +717,10 @@ const RecommendationCard = ({
       opacity: .6
     }
   }, tag))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setRoute({
-      name: 'review',
-      id: rec.bookId
-    }),
+    onClick: () => setRoute(riReviewRouteFromBook({
+      bookId: rec.bookId,
+      title: rec.title
+    })),
     className: "ri-btn-ghost",
     style: {
       font: '700 11px "JetBrains Mono", monospace',

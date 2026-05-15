@@ -146,10 +146,7 @@ const Editors = ({
       }
     }, books.map(b => /*#__PURE__*/React.createElement("div", {
       key: b.id,
-      onClick: () => setRoute({
-        name: 'review',
-        id: b.id
-      }),
+      onClick: () => setRoute(riReviewRouteFromBook(b)),
       style: {
         cursor: 'pointer'
       },

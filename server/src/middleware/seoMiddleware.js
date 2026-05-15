@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const Book = require('../models/Book');
 const config = require('../config/env');
+const { slugify } = require('../utils/slugify');
 
 const SITE_URL = config.siteUrl;
 const SITE_NAME = 'Reviewer Insight';
@@ -39,10 +40,6 @@ function truncate(str, len = 160) {
   const clean = String(str).replace(/\s+/g, ' ').trim();
   if (clean.length <= len) return clean;
   return clean.slice(0, len - 3) + '...';
-}
-
-function slugify(str) {
-  return (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function buildJsonLd(obj) {
@@ -107,7 +104,7 @@ async function browseMeta(genre) {
     itemListElement = topBooks.map((b, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      url: `${SITE_URL}/book/${b._id}/${slugify(b.title)}`,
+      url: `${SITE_URL}/book/${b._id}/${slugify(b.title) || 'book'}`,
       name: `${b.title} by ${b.author}`,
     }));
   } catch (_) {}
@@ -207,7 +204,7 @@ async function bookMeta(bookId) {
       if (!seen.has(id)) { seen.add(id); relatedBooks.push(b); }
     }
 
-    const slug = slugify(book.title);
+    const slug = slugify(book.title) || 'book';
     const canonical = `${SITE_URL}/book/${book._id}/${slug}`;
     const image = book.coverImageUrl || DEFAULT_OG_IMAGE;
 
@@ -312,12 +309,12 @@ function buildSeoContent(book, canonical, relatedBooks = []) {
   const genreLinks = relatedBooks
     .filter(b => b.genre === book.genre)
     .slice(0, 6)
-    .map(b => `<li><a href="${SITE_URL}/book/${b._id}/${slugify(b.title)}">${escHtml(b.title)} by ${escHtml(b.author)}</a></li>`)
+    .map(b => `<li><a href="${SITE_URL}/book/${b._id}/${slugify(b.title) || 'book'}">${escHtml(b.title)} by ${escHtml(b.author)}</a></li>`)
     .join('');
   const authorLinks = relatedBooks
     .filter(b => b.author === book.author && b.genre !== book.genre)
     .slice(0, 3)
-    .map(b => `<li><a href="${SITE_URL}/book/${b._id}/${slugify(b.title)}">${escHtml(b.title)}</a></li>`)
+    .map(b => `<li><a href="${SITE_URL}/book/${b._id}/${slugify(b.title) || 'book'}">${escHtml(b.title)}</a></li>`)
     .join('');
 
   const relatedSection = [

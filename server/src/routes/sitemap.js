@@ -22,9 +22,7 @@ function escXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-function slugify(str) {
-  return (str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
+const { slugify } = require('../utils/slugify');
 
 /** Google requires fully qualified http(s) URLs in image sitemap entries. */
 function toAbsoluteImageUrl(url) {
@@ -92,7 +90,7 @@ async function generateSitemap() {
   }
 
   for (const book of books) {
-    const slug = slugify(book.title);
+    const slug = slugify(book.title) || 'book';
     const lastmod = book.updatedAt ? new Date(book.updatedAt).toISOString() : now;
     const priority = book.featured ? '0.9' : '0.7';
     const bookPath = `/book/${String(book._id)}/${slug}`;
