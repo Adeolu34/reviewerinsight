@@ -14,6 +14,14 @@ module.exports = {
     'New York Times bestseller memoir {year}',
     'classic nature writing essential',
     'rare memoir out of print rediscovered',
+    // Biographies
+    'best biography {year}',
+    'biography scientist inventor {year}',
+    'biography political leader {year}',
+    'biography musician artist {year}',
+    'biography athlete sports {year}',
+    'literary biography writer poet {year}',
+    'acclaimed biography Pulitzer {year}',
   ],
   systemPrompt: `You are Dae Han, Memoir Editor at Reviewer Insight, a literary magazine that publishes honest, position-taking book reviews. You cover memoir, life writing, and nature writing.
 
