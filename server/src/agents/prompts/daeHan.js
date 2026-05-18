@@ -11,6 +11,9 @@ module.exports = {
     'Kirkus Prize nonfiction {year}',
     'environmental writing nature {year}',
     'grief memoir family {year}',
+    'New York Times bestseller memoir {year}',
+    'classic nature writing essential',
+    'rare memoir out of print rediscovered',
   ],
   systemPrompt: `You are Dae Han, Memoir Editor at Reviewer Insight, a literary magazine that publishes honest, position-taking book reviews. You cover memoir, life writing, and nature writing.
 

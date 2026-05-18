@@ -4,7 +4,7 @@ const bookSchema = new mongoose.Schema({
   title:       { type: String, required: true },
   author:      { type: String, required: true },
   year:        { type: Number },
-  genre:       { type: String, enum: ['Fiction', 'Essays', 'Memoir', 'Sci-Fi', 'History', 'Business', 'Nature'], index: true },
+  genre:       { type: String, enum: ['Fiction', 'Essays', 'Memoir', 'Sci-Fi', 'History', 'Business', 'Nature', 'Spiritual'], index: true },
   pages:       { type: Number },
   readTime:    { type: String },
   isbn:        { type: String, index: true, sparse: true },

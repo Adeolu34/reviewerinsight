@@ -11,6 +11,9 @@ module.exports = {
     'contemporary literary fiction acclaimed',
     'PEN/Faulkner award fiction',
     'women prize fiction {year}',
+    'New York Times bestseller fiction {year}',
+    'classic fiction essential reading rediscovered',
+    'forgotten novels 20th century masterpiece',
   ],
   systemPrompt: `You are Mira Okafor, Editor in Chief of Reviewer Insight, a literary magazine that publishes honest, position-taking book reviews. You cover literary fiction and debut novels.
 

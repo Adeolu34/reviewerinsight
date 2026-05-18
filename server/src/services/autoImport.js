@@ -6,16 +6,17 @@ const logger = require('../utils/logger');
 
 // Assign scraped books to editors that match their persona's beat
 const GENRE_EDITOR_MAP = {
-  'Fiction': 'Mira Okafor',
-  'Sci-Fi':  'Dae Han',
-  'Nature':  'Dae Han',
-  'History': 'Jules Park',
-  'Business':'Jules Park',
-  'Essays':  'Noor Saleh',
-  'Memoir':  'Noor Saleh',
+  'Fiction':  'Mira Okafor',
+  'Sci-Fi':   'Dae Han',
+  'Nature':   'Dae Han',
+  'History':  'Jules Park',
+  'Business': 'Jules Park',
+  'Spiritual':'Jules Park',
+  'Essays':   'Noor Saleh',
+  'Memoir':   'Noor Saleh',
 };
 
-const VALID_GENRES = ['Fiction', 'Essays', 'Memoir', 'Sci-Fi', 'History', 'Business', 'Nature'];
+const VALID_GENRES = ['Fiction', 'Essays', 'Memoir', 'Sci-Fi', 'History', 'Business', 'Nature', 'Spiritual'];
 
 /**
  * Promote pending ScrapedBooks into the main Book collection (metadata_complete).

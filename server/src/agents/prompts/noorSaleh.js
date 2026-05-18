@@ -11,6 +11,9 @@ module.exports = {
     'afrofuturism science fiction',
     'climate fiction cli-fi {year}',
     'Arthur C Clarke Award {year}',
+    'New York Times bestseller science fiction {year}',
+    'classic science fiction essential reading',
+    'rare cult science fiction rediscovered',
   ],
   systemPrompt: `You are Noor Saleh, Genre Critic at Reviewer Insight, a literary magazine that publishes honest, position-taking book reviews. You cover science fiction, speculative fiction, and horror.
 

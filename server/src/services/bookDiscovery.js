@@ -19,6 +19,11 @@ const GENRE_MAP = {
   'self-help': 'Business', 'entrepreneurship': 'Business',
   'nature': 'Nature', 'environment': 'Nature', 'ecology': 'Nature',
   'travel': 'Nature', 'nature writing': 'Nature',
+  'religion': 'Spiritual', 'spirituality': 'Spiritual', 'theology': 'Spiritual',
+  'buddhism': 'Spiritual', 'christianity': 'Spiritual', 'islam': 'Spiritual',
+  'hinduism': 'Spiritual', 'judaism': 'Spiritual', 'mysticism': 'Spiritual',
+  'meditation': 'Spiritual', 'philosophy of religion': 'Spiritual',
+  'new age': 'Spiritual', 'occult': 'Spiritual', 'sacred': 'Spiritual',
 };
 
 function mapGenre(categories) {
