@@ -380,6 +380,11 @@ const AdminClient = {
       })
     });
   },
+  seedAuthors() {
+    return this._fetch('/seed-authors', {
+      method: 'POST'
+    });
+  },
   // Duplicates
   getDuplicates() {
     return this._fetch('/duplicates');

@@ -1674,6 +1674,8 @@ const AuthorsSection = () => {
   const [runMsg, setRunMsg] = React.useState('');
   const [batchSize, setBatchSize] = React.useState(50);
   const [regenerating, setRegenerating] = React.useState(null);
+  const [seeding, setSeeding] = React.useState(false);
+  const [seedMsg, setSeedMsg] = React.useState('');
 
   const { data: stats, refresh: refreshStats } = useAdminApi(() => AdminClient.getAuthorStats());
   const { data, loading, refresh } = useAdminApi(
@@ -1682,6 +1684,19 @@ const AuthorsSection = () => {
   );
 
   const refreshAll = () => { refreshStats(); refresh(); };
+
+  const handleSeed = async () => {
+    setSeeding(true); setSeedMsg('');
+    try {
+      const r = await AdminClient.seedAuthors();
+      setSeedMsg(`✓ Seeded — ${r.created.toLocaleString()} new, ${r.updated.toLocaleString()} updated (${r.total.toLocaleString()} total). Now run Sofia Kwon to generate bios.`);
+      setTimeout(refreshAll, 500);
+    } catch (e) {
+      setSeedMsg(`✗ ${e.message}`);
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const handleRun = async () => {
     setRunning(true); setRunMsg('');
@@ -1721,6 +1736,19 @@ const AuthorsSection = () => {
         <Metric label="Pending"         value={fmtNum(stats?.pending || 0)}   color={T.warn} onClick={() => { setBioFilter('pending'); setPage(1); }} />
         <Metric label="Failed"          value={fmtNum(stats?.failed || 0)}    color={stats?.failed > 0 ? T.err : T.text} onClick={() => { setBioFilter('failed'); setPage(1); }} />
       </div>
+
+      {/* Seed from Books */}
+      <Card title="Seed Author List" actions={
+        <Btn variant="ok" disabled={seeding} onClick={handleSeed}>
+          {seeding ? 'Seeding…' : '⊕ Seed from Books'}
+        </Btn>
+      }>
+        <div style={{ fontSize: 13, fontFamily: T.sans, color: T.muted, lineHeight: 1.6 }}>
+          Scans all published books and creates an Author entry for every unique author name.<br />
+          Run this once to populate the list, then let Sofia Kwon generate the bios.
+        </div>
+        {seedMsg && <div style={{ marginTop: 10, fontSize: 12, fontFamily: T.mono, color: seedMsg.startsWith('✓') ? T.ok : T.err }}>{seedMsg}</div>}
+      </Card>
 
       {/* Sofia Kwon trigger */}
       <Card title="Sofia Kwon — Profiles Editor" actions={

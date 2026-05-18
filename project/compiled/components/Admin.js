@@ -3624,6 +3624,8 @@ const AuthorsSection = () => {
   const [runMsg, setRunMsg] = React.useState('');
   const [batchSize, setBatchSize] = React.useState(50);
   const [regenerating, setRegenerating] = React.useState(null);
+  const [seeding, setSeeding] = React.useState(false);
+  const [seedMsg, setSeedMsg] = React.useState('');
   const {
     data: stats,
     refresh: refreshStats
@@ -3642,6 +3644,19 @@ const AuthorsSection = () => {
   const refreshAll = () => {
     refreshStats();
     refresh();
+  };
+  const handleSeed = async () => {
+    setSeeding(true);
+    setSeedMsg('');
+    try {
+      const r = await AdminClient.seedAuthors();
+      setSeedMsg(`✓ Seeded — ${r.created.toLocaleString()} new, ${r.updated.toLocaleString()} updated (${r.total.toLocaleString()} total). Now run Sofia Kwon to generate bios.`);
+      setTimeout(refreshAll, 500);
+    } catch (e) {
+      setSeedMsg(`✗ ${e.message}`);
+    } finally {
+      setSeeding(false);
+    }
   };
   const handleRun = async () => {
     setRunning(true);
@@ -3709,6 +3724,27 @@ const AuthorsSection = () => {
       setPage(1);
     }
   })), /*#__PURE__*/React.createElement(Card, {
+    title: "Seed Author List",
+    actions: /*#__PURE__*/React.createElement(Btn, {
+      variant: "ok",
+      disabled: seeding,
+      onClick: handleSeed
+    }, seeding ? 'Seeding…' : '⊕ Seed from Books')
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontFamily: T.sans,
+      color: T.muted,
+      lineHeight: 1.6
+    }
+  }, "Scans all published books and creates an Author entry for every unique author name.", /*#__PURE__*/React.createElement("br", null), "Run this once to populate the list, then let Sofia Kwon generate the bios."), seedMsg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: seedMsg.startsWith('✓') ? T.ok : T.err
+    }
+  }, seedMsg)), /*#__PURE__*/React.createElement(Card, {
     title: "Sofia Kwon \u2014 Profiles Editor",
     actions: /*#__PURE__*/React.createElement("div", {
       style: {

@@ -266,6 +266,7 @@ const AdminClient = {
   getAdminAuthors(params = {}) { return this._fetch(`/authors?${new URLSearchParams(params)}`); },
   regenerateAuthorBio(id) { return this._fetch(`/authors/${id}/regenerate-bio`, { method: 'POST' }); },
   triggerAuthorBios(batchSize = 50) { return this._fetch('/trigger-agent', { method: 'POST', body: JSON.stringify({ editor: 'Sofia Kwon', batchSize }) }); },
+  seedAuthors()           { return this._fetch('/seed-authors', { method: 'POST' }); },
 
   // Duplicates
   getDuplicates()         { return this._fetch('/duplicates'); },
