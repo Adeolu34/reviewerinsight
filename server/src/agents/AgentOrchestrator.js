@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const EditorAgent = require('./EditorAgent');
+const AuthorBioAgent = require('./AuthorBioAgent');
 const logger = require('../utils/logger');
 
 class AgentOrchestrator {
@@ -7,10 +8,14 @@ class AgentOrchestrator {
     this.agents = {};
     this.scheduledJobs = [];
 
-    // Initialize agents for all editors
+    // Initialize book-review editors
     for (const name of EditorAgent.getAvailableEditors()) {
       this.agents[name] = new EditorAgent(name);
     }
+
+    // Initialize author bio editor
+    this.authorBioAgent = new AuthorBioAgent();
+    this.agents[this.authorBioAgent.name] = this.authorBioAgent;
   }
 
   /**
@@ -44,7 +49,19 @@ class AgentOrchestrator {
       logger.info(`Scheduled ${editor}: ${cronExpr} UTC (batch: ${batchSize})`);
     }
 
-    logger.info('Agent orchestrator started — 4 editors × every 12h × 20 books = ~160 books/day');
+    // Sofia Kwon — author bios every 4 hours, batch 50 (clears backlog fast then idles)
+    const bioJob = cron.schedule('0 */4 * * *', async () => {
+      logger.info(`Scheduled author bio run triggered for ${this.authorBioAgent.name} (batch: 50)`);
+      try {
+        await this.authorBioAgent.run({ batchSize: 50 });
+      } catch (err) {
+        logger.error(`Scheduled author bio run failed: ${err.message}`);
+      }
+    }, { timezone: 'UTC' });
+
+    this.scheduledJobs.push(bioJob);
+    logger.info(`Scheduled ${this.authorBioAgent.name}: every 4h UTC (batch: 50)`);
+    logger.info('Agent orchestrator started — 4 book editors × every 12h + Sofia Kwon (bios) every 4h');
   }
 
   /**
