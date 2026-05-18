@@ -3615,6 +3615,288 @@ const CompetitorSection = () => {
     onClick: () => handleScrape(null)
   }, scraping ? `Scraping ${scraping}…` : 'Run All Sources')));
 };
+
+// ─── SECTION: Authors ────────────────────────────────────────────
+const AuthorsSection = () => {
+  const [bioFilter, setBioFilter] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const [running, setRunning] = React.useState(false);
+  const [runMsg, setRunMsg] = React.useState('');
+  const [batchSize, setBatchSize] = React.useState(50);
+  const [regenerating, setRegenerating] = React.useState(null);
+  const {
+    data: stats,
+    refresh: refreshStats
+  } = useAdminApi(() => AdminClient.getAuthorStats());
+  const {
+    data,
+    loading,
+    refresh
+  } = useAdminApi(() => AdminClient.getAdminAuthors({
+    page,
+    limit: 30,
+    ...(bioFilter ? {
+      bioStatus: bioFilter
+    } : {})
+  }), [page, bioFilter]);
+  const refreshAll = () => {
+    refreshStats();
+    refresh();
+  };
+  const handleRun = async () => {
+    setRunning(true);
+    setRunMsg('');
+    try {
+      const r = await AdminClient.triggerAuthorBios(batchSize);
+      setRunMsg(`✓ Run started — ID: ${r.runId}`);
+      setTimeout(refreshAll, 3000);
+    } catch (e) {
+      setRunMsg(`✗ ${e.message}`);
+    } finally {
+      setRunning(false);
+    }
+  };
+  const handleRegenerate = async (id, name) => {
+    setRegenerating(id);
+    try {
+      await AdminClient.regenerateAuthorBio(id);
+      refreshAll();
+    } catch (e) {
+      alert(`Failed: ${e.message}`);
+    } finally {
+      setRegenerating(null);
+    }
+  };
+  const BIO_STATUS_COLORS = {
+    generated: T.ok,
+    pending: T.warn,
+    failed: T.err
+  };
+  const authors = data?.authors || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement(Metric, {
+    label: "Total Authors",
+    value: fmtNum(stats?.total || 0)
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Bios Generated",
+    value: fmtNum(stats?.generated || 0),
+    color: T.ok
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Pending",
+    value: fmtNum(stats?.pending || 0),
+    color: T.warn,
+    onClick: () => {
+      setBioFilter('pending');
+      setPage(1);
+    }
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Failed",
+    value: fmtNum(stats?.failed || 0),
+    color: stats?.failed > 0 ? T.err : T.text,
+    onClick: () => {
+      setBioFilter('failed');
+      setPage(1);
+    }
+  })), /*#__PURE__*/React.createElement(Card, {
+    title: "Sofia Kwon \u2014 Profiles Editor",
+    actions: /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(Select, {
+      value: batchSize,
+      onChange: v => setBatchSize(Number(v)),
+      style: {
+        width: 120
+      }
+    }, [20, 50, 100, 200, 500].map(n => /*#__PURE__*/React.createElement("option", {
+      key: n,
+      value: n
+    }, n, " authors"))), /*#__PURE__*/React.createElement(Btn, {
+      variant: "ok",
+      disabled: running,
+      onClick: handleRun
+    }, running ? 'Running…' : '▶ Run Now'))
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontFamily: T.sans,
+      color: T.muted,
+      lineHeight: 1.6
+    }
+  }, "Generates AI biographies for pending authors, fetches photos from Open Library.", /*#__PURE__*/React.createElement("br", null), "Auto-runs every 4 hours. Use ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Run Now"), " to blast through the backlog immediately."), runMsg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: runMsg.startsWith('✓') ? T.ok : T.err
+    }
+  }, runMsg)), /*#__PURE__*/React.createElement(Card, {
+    title: "Author Catalog",
+    actions: /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(Select, {
+      value: bioFilter,
+      onChange: v => {
+        setBioFilter(v);
+        setPage(1);
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "All statuses"), /*#__PURE__*/React.createElement("option", {
+      value: "generated"
+    }, "Generated"), /*#__PURE__*/React.createElement("option", {
+      value: "pending"
+    }, "Pending"), /*#__PURE__*/React.createElement("option", {
+      value: "failed"
+    }, "Failed")), /*#__PURE__*/React.createElement(Btn, {
+      small: true,
+      variant: "ghost",
+      onClick: refreshAll
+    }, "\u21BB Refresh"))
+  }, loading ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: 30,
+      color: T.muted,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, "Loading\u2026") : authors.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: 30,
+      color: T.dim,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, "No authors found.", !stats?.total ? ' Run the populate script first.' : '') : /*#__PURE__*/React.createElement(Table, {
+    cols: ['Author', 'Nationality', 'Books', 'Genres', 'Status', 'Photo', '']
+  }, authors.map(a => /*#__PURE__*/React.createElement("tr", {
+    key: a._id,
+    style: {
+      borderBottom: `1px solid ${T.border}`
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontFamily: T.serif,
+      fontWeight: 700,
+      color: T.text
+    }
+  }, a.name), a.shortBio && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontFamily: T.sans,
+      color: T.dim,
+      marginTop: 2,
+      maxWidth: 240,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    }
+  }, a.shortBio)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: T.muted
+    }
+  }, a.nationality || '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      fontSize: 13,
+      fontFamily: T.mono,
+      color: T.text,
+      textAlign: 'center'
+    }
+  }, a.bookCount), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      fontSize: 11,
+      fontFamily: T.mono,
+      color: T.muted
+    }
+  }, (a.genres || []).slice(0, 2).join(', ') || '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      padding: '3px 10px',
+      borderRadius: 12,
+      fontSize: 10,
+      fontWeight: 700,
+      fontFamily: T.mono,
+      textTransform: 'uppercase',
+      letterSpacing: '.06em',
+      background: BIO_STATUS_COLORS[a.bioStatus] || T.dim,
+      color: '#fff'
+    }
+  }, a.bioStatus)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      textAlign: 'center'
+    }
+  }, a.photoUrl ? /*#__PURE__*/React.createElement("img", {
+    src: a.photoUrl,
+    alt: "",
+    style: {
+      width: 32,
+      height: 32,
+      borderRadius: '50%',
+      objectFit: 'cover',
+      border: `1px solid ${T.border}`
+    },
+    onError: e => {
+      e.target.style.display = 'none';
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: T.dim,
+      fontFamily: T.mono
+    }
+  }, "\u2014")), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px'
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    disabled: regenerating === a._id,
+    onClick: () => handleRegenerate(a._id, a.name)
+  }, regenerating === a._id ? '…' : '↺ Regen'))))), /*#__PURE__*/React.createElement(Pagination, {
+    page: page,
+    totalPages: data?.pages,
+    onChange: setPage
+  })));
+};
 const SECTIONS = [{
   id: 'overview',
   label: 'Overview',
@@ -3627,6 +3909,10 @@ const SECTIONS = [{
   id: 'books',
   label: 'Books',
   icon: '▤'
+}, {
+  id: 'authors',
+  label: 'Authors',
+  icon: '✍'
 }, {
   id: 'scraper',
   label: 'Scraper',
@@ -3669,6 +3955,7 @@ const Admin = ({
     overview: OverviewSection,
     runs: RunsSection,
     books: BooksSection,
+    authors: AuthorsSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,

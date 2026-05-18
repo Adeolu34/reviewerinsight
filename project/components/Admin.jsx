@@ -1666,10 +1666,139 @@ const CompetitorSection = () => {
   );
 };
 
+// ─── SECTION: Authors ────────────────────────────────────────────
+const AuthorsSection = () => {
+  const [bioFilter, setBioFilter] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const [running, setRunning] = React.useState(false);
+  const [runMsg, setRunMsg] = React.useState('');
+  const [batchSize, setBatchSize] = React.useState(50);
+  const [regenerating, setRegenerating] = React.useState(null);
+
+  const { data: stats, refresh: refreshStats } = useAdminApi(() => AdminClient.getAuthorStats());
+  const { data, loading, refresh } = useAdminApi(
+    () => AdminClient.getAdminAuthors({ page, limit: 30, ...(bioFilter ? { bioStatus: bioFilter } : {}) }),
+    [page, bioFilter]
+  );
+
+  const refreshAll = () => { refreshStats(); refresh(); };
+
+  const handleRun = async () => {
+    setRunning(true); setRunMsg('');
+    try {
+      const r = await AdminClient.triggerAuthorBios(batchSize);
+      setRunMsg(`✓ Run started — ID: ${r.runId}`);
+      setTimeout(refreshAll, 3000);
+    } catch (e) {
+      setRunMsg(`✗ ${e.message}`);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleRegenerate = async (id, name) => {
+    setRegenerating(id);
+    try {
+      await AdminClient.regenerateAuthorBio(id);
+      refreshAll();
+    } catch (e) {
+      alert(`Failed: ${e.message}`);
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
+  const BIO_STATUS_COLORS = { generated: T.ok, pending: T.warn, failed: T.err };
+  const authors = data?.authors || [];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <Metric label="Total Authors"    value={fmtNum(stats?.total || 0)} />
+        <Metric label="Bios Generated"  value={fmtNum(stats?.generated || 0)} color={T.ok} />
+        <Metric label="Pending"         value={fmtNum(stats?.pending || 0)}   color={T.warn} onClick={() => { setBioFilter('pending'); setPage(1); }} />
+        <Metric label="Failed"          value={fmtNum(stats?.failed || 0)}    color={stats?.failed > 0 ? T.err : T.text} onClick={() => { setBioFilter('failed'); setPage(1); }} />
+      </div>
+
+      {/* Sofia Kwon trigger */}
+      <Card title="Sofia Kwon — Profiles Editor" actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Select value={batchSize} onChange={v => setBatchSize(Number(v))} style={{ width: 120 }}>
+            {[20, 50, 100, 200, 500].map(n => <option key={n} value={n}>{n} authors</option>)}
+          </Select>
+          <Btn variant="ok" disabled={running} onClick={handleRun}>
+            {running ? 'Running…' : '▶ Run Now'}
+          </Btn>
+        </div>
+      }>
+        <div style={{ fontSize: 13, fontFamily: T.sans, color: T.muted, lineHeight: 1.6 }}>
+          Generates AI biographies for pending authors, fetches photos from Open Library.<br />
+          Auto-runs every 4 hours. Use <strong style={{ color: T.text }}>Run Now</strong> to blast through the backlog immediately.
+        </div>
+        {runMsg && <div style={{ marginTop: 10, fontSize: 12, fontFamily: T.mono, color: runMsg.startsWith('✓') ? T.ok : T.err }}>{runMsg}</div>}
+      </Card>
+
+      {/* Author table */}
+      <Card title="Author Catalog" actions={
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Select value={bioFilter} onChange={v => { setBioFilter(v); setPage(1); }}>
+            <option value="">All statuses</option>
+            <option value="generated">Generated</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+          </Select>
+          <Btn small variant="ghost" onClick={refreshAll}>↻ Refresh</Btn>
+        </div>
+      }>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 30, color: T.muted, fontFamily: T.mono, fontSize: 12 }}>Loading…</div>
+        ) : authors.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 30, color: T.dim, fontFamily: T.mono, fontSize: 12 }}>
+            No authors found.{!stats?.total ? ' Run the populate script first.' : ''}
+          </div>
+        ) : (
+          <Table cols={['Author', 'Nationality', 'Books', 'Genres', 'Status', 'Photo', '']}>
+            {authors.map(a => (
+              <tr key={a._id} style={{ borderBottom: `1px solid ${T.border}` }}>
+                <td style={{ padding: '10px 12px' }}>
+                  <div style={{ fontSize: 14, fontFamily: T.serif, fontWeight: 700, color: T.text }}>{a.name}</div>
+                  {a.shortBio && <div style={{ fontSize: 11, fontFamily: T.sans, color: T.dim, marginTop: 2, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.shortBio}</div>}
+                </td>
+                <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: T.mono, color: T.muted }}>{a.nationality || '—'}</td>
+                <td style={{ padding: '10px 12px', fontSize: 13, fontFamily: T.mono, color: T.text, textAlign: 'center' }}>{a.bookCount}</td>
+                <td style={{ padding: '10px 12px', fontSize: 11, fontFamily: T.mono, color: T.muted }}>{(a.genres || []).slice(0, 2).join(', ') || '—'}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.06em', background: BIO_STATUS_COLORS[a.bioStatus] || T.dim, color: '#fff' }}>
+                    {a.bioStatus}
+                  </span>
+                </td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                  {a.photoUrl
+                    ? <img src={a.photoUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${T.border}` }} onError={e => { e.target.style.display = 'none'; }} />
+                    : <span style={{ fontSize: 11, color: T.dim, fontFamily: T.mono }}>—</span>}
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <Btn small variant="ghost" disabled={regenerating === a._id} onClick={() => handleRegenerate(a._id, a.name)}>
+                    {regenerating === a._id ? '…' : '↺ Regen'}
+                  </Btn>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        )}
+        <Pagination page={page} totalPages={data?.pages} onChange={setPage} />
+      </Card>
+    </div>
+  );
+};
+
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: '◐' },
   { id: 'runs', label: 'Agent Runs', icon: '▶' },
   { id: 'books', label: 'Books', icon: '▤' },
+  { id: 'authors', label: 'Authors', icon: '✍' },
   { id: 'scraper', label: 'Scraper', icon: '⇣' },
   { id: 'duplicates', label: 'Duplicates', icon: '⊘' },
   { id: 'competitors', label: 'Competitors', icon: '◈' },
@@ -1694,6 +1823,7 @@ const Admin = ({ setRoute }) => {
     overview: OverviewSection,
     runs: RunsSection,
     books: BooksSection,
+    authors: AuthorsSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,

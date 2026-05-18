@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const AgentRun = require('../models/AgentRun');
 const Book = require('../models/Book');
+const Author = require('../models/Author');
 const AdminUser = require('../models/AdminUser');
 const ScrapedBook = require('../models/ScrapedBook');
 const config = require('../config/env');
@@ -781,6 +782,44 @@ router.post('/import-book', async (req, res, next) => {
     }
     next(err);
   }
+});
+
+// ─── GET /api/admin/author-stats ────────────────────────────────
+router.get('/author-stats', async (req, res, next) => {
+  try {
+    const [total, generated, pending, failed] = await Promise.all([
+      Author.countDocuments(),
+      Author.countDocuments({ bioStatus: 'generated' }),
+      Author.countDocuments({ bioStatus: 'pending' }),
+      Author.countDocuments({ bioStatus: 'failed' }),
+    ]);
+    res.json({ total, generated, pending, failed });
+  } catch (err) { next(err); }
+});
+
+// ─── GET /api/admin/authors ──────────────────────────────────────
+router.get('/authors', async (req, res, next) => {
+  try {
+    const { page = 1, limit = 30, bioStatus, q } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const filter = {};
+    if (bioStatus) filter.bioStatus = bioStatus;
+    if (q) filter.$text = { $search: q };
+
+    const [authors, total] = await Promise.all([
+      Author.find(filter).sort({ bookCount: -1, name: 1 }).skip(skip).limit(parseInt(limit)).lean(),
+      Author.countDocuments(filter),
+    ]);
+    res.json({ authors, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) { next(err); }
+});
+
+// ─── POST /api/admin/authors/:id/regenerate-bio ──────────────────
+router.post('/authors/:id/regenerate-bio', async (req, res, next) => {
+  try {
+    await Author.findByIdAndUpdate(req.params.id, { bioStatus: 'pending' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 router.seedInitialAdmin = seedInitialAdmin;
