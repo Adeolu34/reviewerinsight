@@ -22,6 +22,7 @@ const trendingRouter = require('./routes/trending');
 const sitemapRouter = require('./routes/sitemap');
 const feedRouter = require('./routes/feed');
 const bookCanonicalRouter = require('./routes/bookCanonical');
+const authorsRouter = require('./routes/authors');
 const seoMiddleware = require('./middleware/seoMiddleware');
 
 async function startServer() {
@@ -58,6 +59,7 @@ async function startServer() {
   app.use('/api/admin', adminRouter);
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
+  app.use('/api/authors', authorsRouter);
 
   // Health check
   app.get('/api/health', (req, res) => {

@@ -72,6 +72,19 @@ const ApiClient = {
     return this._fetch('/books/trending');
   },
 
+  async getAuthors(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this._fetch(`/authors?${qs}`);
+  },
+
+  async getAuthor(slug) {
+    return this._fetch(`/authors/${slug}`);
+  },
+
+  async getAuthorBooks(slug) {
+    return this._fetch(`/authors/${slug}/books`);
+  },
+
   async search(q, params = {}) {
     const qs = new URLSearchParams({ q, ...params }).toString();
     const result = await this._fetch(`/search?${qs}`);

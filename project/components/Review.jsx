@@ -93,7 +93,9 @@ const Review = ({ bookId, initialTab, setRoute, accent, density }) => {
             <h1 style={{ font:'900 88px/0.98 "DM Serif Display", Georgia, serif', margin:'10px 0 18px', letterSpacing:'-.02em', textWrap:'balance', paddingBottom: 4, animation:'ri-hero-text .8s .25s cubic-bezier(.2,.8,.2,1) both' }}>
               {book.title}
             </h1>
-            <div style={{ font:'500 22px "DM Serif Display", Georgia, serif', fontStyle:'italic', opacity:.8, marginBottom: 22, animation:'ri-fadeUp .5s .35s ease both' }}>by {book.author}</div>
+            <div style={{ font:'500 22px "DM Serif Display", Georgia, serif', fontStyle:'italic', opacity:.8, marginBottom: 22, animation:'ri-fadeUp .5s .35s ease both' }}>
+              by <button onClick={() => setRoute({ name: 'author', slug: riSlugify(book.author) })} className="ri-link" style={{ all:'unset', cursor:'pointer', textDecoration:'underline', textDecorationStyle:'dotted', textDecorationColor:'rgba(20,18,16,.4)', textUnderlineOffset:4 }}>{book.author}</button>
+            </div>
 
             <div style={{ display:'flex', alignItems:'center', gap: 28, flexWrap:'wrap', padding:'16px 0', borderTop:'1.5px solid #141210', borderBottom:'1.5px solid #141210', marginBottom: 22, animation:'ri-fadeUp .5s .4s ease both' }}>
               <Stars value={book.rating} size={16}/>

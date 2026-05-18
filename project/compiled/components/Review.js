@@ -171,7 +171,21 @@ const Review = ({
       marginBottom: 22,
       animation: 'ri-fadeUp .5s .35s ease both'
     }
-  }, "by ", book.author), /*#__PURE__*/React.createElement("div", {
+  }, "by ", /*#__PURE__*/React.createElement("button", {
+    onClick: () => setRoute({
+      name: 'author',
+      slug: riSlugify(book.author)
+    }),
+    className: "ri-link",
+    style: {
+      all: 'unset',
+      cursor: 'pointer',
+      textDecoration: 'underline',
+      textDecorationStyle: 'dotted',
+      textDecorationColor: 'rgba(20,18,16,.4)',
+      textUnderlineOffset: 4
+    }
+  }, book.author)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',

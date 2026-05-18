@@ -93,6 +93,7 @@ const Header = ({ route, setRoute, accent, dark }) => {
   const nav = [
     { id: 'home', label: 'Home' },
     { id: 'browse', label: 'Browse' },
+    { id: 'authors', label: 'Authors' },
     { id: 'recommend', label: 'For You' },
     { id: 'editors', label: 'Editors' },
     { id: 'membership', label: 'Membership' },
@@ -131,7 +132,7 @@ const Header = ({ route, setRoute, accent, dark }) => {
         </button>
         <nav style={{ display:'flex', gap: 4 }}>
           {nav.map(n => {
-            const isActive = route.name === n.id;
+            const isActive = route.name === n.id || (n.id === 'authors' && route.name === 'author');
             return (
               <button key={n.id} onClick={()=>setRoute({name:n.id})} className="ri-link" style={{
                 font:'600 13px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',

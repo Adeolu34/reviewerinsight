@@ -14,6 +14,8 @@ function routeToPath(r) {
       if (!id) return '/';
       return slug ? `/book/${id}/${slug}` : `/book/${id}`;
     }
+    case 'authors': return '/authors';
+    case 'author': return r.slug ? `/author/${r.slug}` : '/authors';
     default: return '/';
   }
 }
@@ -26,6 +28,9 @@ function pathToRoute(pathname) {
   if (p === '/editors') return { name: 'editors' };
   if (p === '/membership') return { name: 'membership' };
   if (p === '/reviewadmin') return { name: 'admin' };
+  if (p === '/authors') return { name: 'authors' };
+  const authorMatch = p.match(/^\/author\/([^/?#]+)/);
+  if (authorMatch) return { name: 'author', slug: decodeURIComponent(authorMatch[1]) };
   const bookMatch = p.match(/^\/book\/([a-f0-9]{24})(?:\/([^/?#]+))?/i);
   if (bookMatch) {
     const out = { name: 'review', id: bookMatch[1] };
@@ -101,7 +106,8 @@ function App() {
       : route.name === 'editors' ? window.Editors
         : route.name === 'membership' ? window.Membership
           : route.name === 'review' ? () => <window.Review bookId={route.id} initialTab={route.tab} {...ctx} />
-            : window.Home;
+            : (route.name === 'authors' || route.name === 'author') ? () => <window.Authors route={route} {...ctx} />
+              : window.Home;
 
   return (
     <div data-screen-label={`Route: ${route.name}`} style={{ '--accent': tweaks.accent }}>

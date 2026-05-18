@@ -22,6 +22,10 @@ function routeToPath(r) {
         if (!id) return '/';
         return slug ? `/book/${id}/${slug}` : `/book/${id}`;
       }
+    case 'authors':
+      return '/authors';
+    case 'author':
+      return r.slug ? `/author/${r.slug}` : '/authors';
     default:
       return '/';
   }
@@ -45,6 +49,14 @@ function pathToRoute(pathname) {
   };
   if (p === '/reviewadmin') return {
     name: 'admin'
+  };
+  if (p === '/authors') return {
+    name: 'authors'
+  };
+  const authorMatch = p.match(/^\/author\/([^/?#]+)/);
+  if (authorMatch) return {
+    name: 'author',
+    slug: decodeURIComponent(authorMatch[1])
   };
   const bookMatch = p.match(/^\/book\/([a-f0-9]{24})(?:\/([^/?#]+))?/i);
   if (bookMatch) {
@@ -140,6 +152,8 @@ function App() {
   const Page = route.name === 'browse' ? window.Browse : route.name === 'recommend' ? window.Recommend : route.name === 'editors' ? window.Editors : route.name === 'membership' ? window.Membership : route.name === 'review' ? () => /*#__PURE__*/React.createElement(window.Review, _extends({
     bookId: route.id,
     initialTab: route.tab
+  }, ctx)) : route.name === 'authors' || route.name === 'author' ? () => /*#__PURE__*/React.createElement(window.Authors, _extends({
+    route: route
   }, ctx)) : window.Home;
   return /*#__PURE__*/React.createElement("div", {
     "data-screen-label": `Route: ${route.name}`,

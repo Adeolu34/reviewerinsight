@@ -182,6 +182,9 @@ const Header = ({
     id: 'browse',
     label: 'Browse'
   }, {
+    id: 'authors',
+    label: 'Authors'
+  }, {
     id: 'recommend',
     label: 'For You'
   }, {
@@ -285,7 +288,7 @@ const Header = ({
       gap: 4
     }
   }, nav.map(n => {
-    const isActive = route.name === n.id;
+    const isActive = route.name === n.id || n.id === 'authors' && route.name === 'author';
     return /*#__PURE__*/React.createElement("button", {
       key: n.id,
       onClick: () => setRoute({
