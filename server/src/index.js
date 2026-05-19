@@ -64,12 +64,11 @@ async function startServer() {
   // Video file download (served from disk)
   const VideoJob = require('./models/VideoJob');
   const requireAdmin = require('./middleware/requireAdmin');
-  const path = require('path');
+  const fs = require('fs');
   app.get('/videos/:id/download', requireAdmin, async (req, res, next) => {
     try {
       const job = await VideoJob.findById(req.params.id).lean();
       if (!job || !job.videoPath) return res.status(404).json({ error: 'Video not found' });
-      const fs = require('fs');
       if (!fs.existsSync(job.videoPath)) return res.status(404).json({ error: 'File not on disk' });
       const filename = path.basename(job.videoPath);
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const videoJobSchema = new mongoose.Schema({
-  bookId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Book', required: true, index: true },
+  bookId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Book', required: true },
   status:  {
     type: String,
     enum: ['queued', 'scripting', 'tts', 'rendering', 'done', 'failed'],
