@@ -7,13 +7,17 @@ function jsonFromAssistantContent(raw) {
     throw new Error('Empty model response');
   }
   let s = String(raw).trim();
-  const fence = /^```(?:json)?\s*\r?\n?([\s\S]*?)\r?\n?```/m.exec(s);
-  if (fence) {
-    s = fence[1].trim();
-  }
+
+  // Strip opening fence (```json or ```) — handles both complete and truncated fences
+  s = s.replace(/^```(?:json)?\s*\r?\n?/, '');
+  // Strip closing fence if present
+  s = s.replace(/\r?\n?```\s*$/, '');
+  s = s.trim();
+
   try {
     return JSON.parse(s);
   } catch (_) {
+    // Extract the {...} payload; handles trailing prose or truncated JSON
     const start = s.indexOf('{');
     const end = s.lastIndexOf('}');
     if (start === -1 || end === -1 || end <= start) {
