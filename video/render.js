@@ -50,7 +50,7 @@ async function main() {
   for await (const chunk of process.stdin) input += chunk;
 
   const job = JSON.parse(input);
-  const { book, scenes, audioFile, outputPath, fps = 30 } = job;
+  const { book, scenes, audioFile, outputPath, fps = 30, captions } = job;
 
   if (!book || !scenes || !outputPath) {
     console.error('render.js: missing required fields (book, scenes, outputPath)');
@@ -104,9 +104,10 @@ async function main() {
   const inputProps = {
     book,
     scenes,
-    audioFile:            publicAudioName || null,
-    backgroundMusicFile:  publicBgName    || null,
+    audioFile:             publicAudioName || null,
+    backgroundMusicFile:   publicBgName    || null,
     totalDurationInFrames: totalFrames,
+    captions:              captions || null,
   };
 
   const composition = await selectComposition({

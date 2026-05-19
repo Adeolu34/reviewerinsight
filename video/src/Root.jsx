@@ -35,6 +35,7 @@ const Root = () => (
       book:      DEFAULT_BOOK,
       scenes:    DEFAULT_SCENES,
       audioFile: null,
+      captions:  null,
     }}
   />
 );

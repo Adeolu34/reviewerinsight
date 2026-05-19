@@ -7,6 +7,7 @@ const React = require('react');
 const ACCENT = '#E8432C';
 const SERIF  = '"DM Serif Display", Georgia, serif';
 const MONO   = '"JetBrains Mono", monospace';
+const TRANSITION_FRAMES = 12; // cross-fade overlap between scenes
 
 function fadeIn(frame, start, dur, easing = Easing.ease) {
   return interpolate(frame, [start, start + dur], [0, 1], {
@@ -96,6 +97,81 @@ const ScanLine = ({ totalFrames }) => {
       background:'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%)',
       opacity:op, pointerEvents:'none',
     }} />
+  );
+};
+
+// ─── Scene wrapper — handles cross-fade in/out for every scene ─
+const SceneWrapper = ({ durationInFrames, children }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const fadeInOp  = interpolate(frame, [0, fps * 0.25], [0, 1], { extrapolateLeft:'clamp', extrapolateRight:'clamp' });
+  const fadeOutOp = interpolate(frame, [durationInFrames - TRANSITION_FRAMES, durationInFrames], [1, 0], { extrapolateLeft:'clamp', extrapolateRight:'clamp' });
+  return (
+    <div style={{ position:'absolute', inset:0, opacity: Math.min(fadeInOp, fadeOutOp) }}>
+      {children}
+    </div>
+  );
+};
+
+// ─── Word-level captions overlay ──────────────────────────────
+const WORDS_PER_CAPTION = 4;
+
+const CaptionsOverlay = ({ captions }) => {
+  const frame    = useCurrentFrame();
+  const { fps }  = useVideoConfig();
+  if (!captions?.length) return null;
+
+  const currentMs = (frame / fps) * 1000;
+
+  // Group words into segments
+  const segments = [];
+  for (let i = 0; i < captions.length; i += WORDS_PER_CAPTION) {
+    segments.push(captions.slice(i, i + WORDS_PER_CAPTION));
+  }
+
+  const activeIdx = segments.findIndex(seg =>
+    currentMs >= seg[0].startMs - 50 && currentMs <= seg[seg.length - 1].endMs + 500
+  );
+  if (activeIdx === -1) return null;
+
+  const seg = segments[activeIdx];
+  const segStart = seg[0].startMs;
+  const fadeOp = interpolate(currentMs, [segStart - 50, segStart + 60], [0, 1], { extrapolateLeft:'clamp', extrapolateRight:'clamp' });
+
+  return (
+    <div style={{
+      position:'absolute', bottom:110, left:0, right:0,
+      display:'flex', justifyContent:'center',
+      padding:'0 48px',
+      opacity: fadeOp,
+      pointerEvents:'none',
+    }}>
+      <div style={{
+        display:'inline-flex', flexWrap:'wrap', gap:'0 0.28em',
+        justifyContent:'center',
+        background:'rgba(0,0,0,0.78)',
+        backdropFilter:'blur(8px)',
+        padding:'12px 26px', borderRadius:12,
+        maxWidth:'88%',
+      }}>
+        {seg.map((w, i) => {
+          const active = currentMs >= w.startMs && currentMs <= w.endMs + 180;
+          return (
+            <span key={i} style={{
+              fontFamily: MONO,
+              fontSize: 40,
+              fontWeight: 800,
+              letterSpacing: '.03em',
+              textTransform: 'uppercase',
+              color: active ? ACCENT : '#ffffff',
+              textShadow: active ? `0 0 18px ${ACCENT}99` : 'none',
+            }}>
+              {w.word}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 };
 
@@ -391,18 +467,23 @@ const OutroScene = ({ scene, book }) => {
 };
 
 // ─── Root composition ─────────────────────────────────────────
-const BookSummary = ({ book, scenes, audioFile, backgroundMusicFile, totalDurationInFrames }) => {
+const BookSummary = ({ book, scenes, audioFile, backgroundMusicFile, totalDurationInFrames, captions }) => {
   const { fps, durationInFrames } = useVideoConfig();
   const frame       = useCurrentFrame();
   const totalFrames = totalDurationInFrames || durationInFrames;
 
+  // Each scene's startFrame is based on estimated durations (no overlap offset),
+  // but durationInFrames extends by TRANSITION_FRAMES so consecutive scenes overlap
+  // — this creates cross-fade transitions between scenes.
   let cursor = 0;
   const timeline = scenes.map((scene, i) => {
     const isLast      = i === scenes.length - 1;
     const startFrame  = cursor;
     const estimated   = Math.max(fps * 3, Math.round(scene.estimatedSeconds * fps));
-    const sceneFrames = isLast ? Math.max(estimated, totalFrames - cursor) : estimated;
-    cursor += sceneFrames;
+    const sceneFrames = isLast
+      ? Math.max(estimated + TRANSITION_FRAMES, totalFrames - cursor + TRANSITION_FRAMES)
+      : estimated + TRANSITION_FRAMES;
+    cursor += estimated; // advance by estimated, NOT sceneFrames, so next scene overlaps
     return { ...scene, startFrame, durationInFrames: sceneFrames };
   });
 
@@ -419,13 +500,18 @@ const BookSummary = ({ book, scenes, audioFile, backgroundMusicFile, totalDurati
 
       {timeline.map(scene => (
         <Sequence key={scene.id} from={scene.startFrame} durationInFrames={scene.durationInFrames}>
-          {scene.id === 'intro'   && <IntroScene   book={book} durationInFrames={scene.durationInFrames} />}
-          {scene.id === 'hook'    && <ContentScene scene={scene} book={book} index={1} />}
-          {scene.id === 'body'    && <ContentScene scene={scene} book={book} index={2} />}
-          {scene.id === 'verdict' && <VerdictScene scene={scene} book={book} />}
-          {scene.id === 'outro'   && <OutroScene   scene={scene} book={book} />}
+          <SceneWrapper durationInFrames={scene.durationInFrames}>
+            {scene.id === 'intro'   && <IntroScene   book={book} durationInFrames={scene.durationInFrames} />}
+            {scene.id === 'hook'    && <ContentScene scene={scene} book={book} index={1} />}
+            {scene.id === 'body'    && <ContentScene scene={scene} book={book} index={2} />}
+            {scene.id === 'verdict' && <VerdictScene scene={scene} book={book} />}
+            {scene.id === 'outro'   && <OutroScene   scene={scene} book={book} />}
+          </SceneWrapper>
         </Sequence>
       ))}
+
+      {/* Word-level captions — rendered above everything */}
+      <CaptionsOverlay captions={captions} />
 
       {/* Global progress bar at bottom */}
       <div style={{ position:'absolute', bottom:0, left:0, right:0, height:4, background:'rgba(255,255,255,0.06)', pointerEvents:'none' }}>
