@@ -6,7 +6,7 @@ const Book     = require('../models/Book');
 const VideoJob = require('../models/VideoJob');
 const { generateVideoScript }  = require('../services/videoScript');
 const { generateSpeechFile }   = require('../services/elevenLabs');
-const { generateCaptions }     = require('../services/captionService');
+const { generateCaptionsFromScript } = require('../services/captionService');
 const { uploadVideo, isConfigured: youtubeConfigured } = require('../services/youtube');
 const logger   = require('../utils/logger');
 
@@ -58,8 +58,8 @@ class VideoAgent {
       await job.updateOne({ audioPath });
       logger.info(`[VideoAgent] Audio saved → ${audioPath}`);
 
-      // ── Step 2.5: Word-level captions via Whisper ────────────────
-      const captions = await generateCaptions(audioPath);
+      // ── Step 2.5: Word-level captions from script (free, no API) ─
+      const captions = generateCaptionsFromScript(script.scenes);
 
       // ── Step 3: Render with Remotion ─────────────────────────────
       await job.updateOne({ status: 'rendering' });

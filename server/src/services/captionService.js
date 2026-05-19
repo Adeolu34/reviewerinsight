@@ -1,47 +1,33 @@
-const fs = require('fs');
-const OpenAI = require('openai');
 const logger = require('../utils/logger');
 
-// Whisper requires a direct OpenAI key — OpenRouter doesn't support audio transcription
-function _getClient() {
-  if (!process.env.OPENAI_API_KEY) return null;
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
+/**
+ * Generate word-level caption timings from narration text + scene durations.
+ * Free — no API calls. Timings are proportional to word count within each scene.
+ */
+function generateCaptionsFromScript(scenes) {
+  const captions = [];
+  let cursorMs = 0;
 
-async function generateCaptions(audioPath) {
-  const openai = _getClient();
-  if (!openai) {
-    logger.warn('[Captions] OPENAI_API_KEY not set — skipping word-level captions');
-    return null;
-  }
-  if (!fs.existsSync(audioPath)) {
-    logger.warn(`[Captions] Audio file not found: ${audioPath}`);
-    return null;
-  }
+  for (const scene of scenes) {
+    if (!scene.narration) { cursorMs += (scene.estimatedSeconds || 0) * 1000; continue; }
 
-  try {
-    logger.info('[Captions] Transcribing audio for word-level captions…');
-    const response = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(audioPath),
-      model: 'whisper-1',
-      response_format: 'verbose_json',
-      timestamp_granularities: ['word'],
+    const words = scene.narration.trim().split(/\s+/).filter(Boolean);
+    const sceneDurationMs = Math.max((scene.estimatedSeconds || 3) * 1000, words.length * 350);
+    const msPerWord = sceneDurationMs / words.length;
+
+    words.forEach((word, i) => {
+      captions.push({
+        word,
+        startMs: Math.round(cursorMs + i * msPerWord),
+        endMs:   Math.round(cursorMs + (i + 0.88) * msPerWord),
+      });
     });
 
-    const captions = (response.words || [])
-      .map(w => ({
-        word:    w.word.trim(),
-        startMs: Math.round(w.start * 1000),
-        endMs:   Math.round(w.end   * 1000),
-      }))
-      .filter(w => w.word);
-
-    logger.info(`[Captions] ${captions.length} word timestamps generated`);
-    return captions;
-  } catch (err) {
-    logger.error(`[Captions] Transcription failed: ${err.message}`);
-    return null; // Non-fatal — video renders without captions
+    cursorMs += sceneDurationMs;
   }
+
+  logger.info(`[Captions] Generated ${captions.length} word timings from script (no API)`);
+  return captions;
 }
 
-module.exports = { generateCaptions };
+module.exports = { generateCaptionsFromScript };
