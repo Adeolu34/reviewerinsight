@@ -70,7 +70,7 @@ Return this exact JSON structure:
     },
     {
       "id": "outro",
-      "narration": "Short CTA. Mention reviewerinsight.com for the full review. Max 2 sentences."
+      "narration": "2-sentence CTA. First sentence: ask viewers to like, comment, share and subscribe. Second sentence: send them to reviewerinsight.com for the full review."
     }
   ],
   "description": "YouTube video description (2-3 sentences + hashtags)"
@@ -84,7 +84,7 @@ Return this exact JSON structure:
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.75,
-      max_tokens: 1200,
+      max_tokens: 1600,
     });
   });
 

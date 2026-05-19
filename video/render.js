@@ -7,6 +7,9 @@
  *
  * Or directly for testing:
  *   echo '{"book":{...},"scenes":[...],"audioFile":"narration.mp3","outputPath":"/tmp/out.mp4"}' | node render.js
+ *
+ * Background music: place a royalty-free MP3 at video/assets/background.mp3
+ * (or set BACKGROUND_MUSIC_FILE env var to an absolute path).
  */
 const { bundle }      = require('@remotion/bundler');
 const { renderMedia, selectComposition } = require('@remotion/renderer');
@@ -16,9 +19,19 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
+// Locate Remotion's bundled ffprobe — handles Windows and Linux
+function findFfprobe() {
+  const candidates = [
+    path.join(__dirname, 'node_modules', '@remotion', 'compositor-win32-x64-msvc', 'ffprobe.exe'),
+    path.join(__dirname, 'node_modules', '@remotion', 'compositor-linux-x64-gnu',  'ffprobe'),
+    path.join(__dirname, 'node_modules', '@remotion', 'compositor-linux-x64-musl', 'ffprobe'),
+  ];
+  return candidates.find(p => fs.existsSync(p)) || null;
+}
+
 async function getAudioDurationSecs(filePath) {
-  const ffprobe = path.join(__dirname, 'node_modules', '@remotion', 'compositor-win32-x64-msvc', 'ffprobe.exe');
-  if (!fs.existsSync(ffprobe)) return null;
+  const ffprobe = findFfprobe();
+  if (!ffprobe) return null;
   try {
     const { stdout } = await execFileAsync(ffprobe, [
       '-v', 'error', '-show_entries', 'format=duration',
@@ -44,13 +57,24 @@ async function main() {
     process.exit(1);
   }
 
-  // Copy audio into video/public/ so Remotion's staticFile() can serve it
   const publicDir = path.join(__dirname, 'public');
   await fs.promises.mkdir(publicDir, { recursive: true });
+
+  // Copy narration audio into public/ so staticFile() can serve it
   let publicAudioName = null;
   if (audioFile && fs.existsSync(audioFile)) {
     publicAudioName = `audio-${Date.now()}${path.extname(audioFile)}`;
     await fs.promises.copyFile(audioFile, path.join(publicDir, publicAudioName));
+  }
+
+  // Copy background music into public/ if available
+  const bgMusicSrc = process.env.BACKGROUND_MUSIC_FILE
+    || path.join(__dirname, 'assets', 'background.mp3');
+  let publicBgName = null;
+  if (fs.existsSync(bgMusicSrc)) {
+    publicBgName = `bg-${Date.now()}${path.extname(bgMusicSrc)}`;
+    await fs.promises.copyFile(bgMusicSrc, path.join(publicDir, publicBgName));
+    console.log('Background music loaded:', path.basename(bgMusicSrc));
   }
 
   const entryPoint = path.join(__dirname, 'src', 'index.jsx');
@@ -77,12 +101,18 @@ async function main() {
   const audioFrames = audioDurationSecs ? Math.ceil(audioDurationSecs * fps) + fps * 2 : 0;
   const totalFrames = Math.max(estimatedFrames, audioFrames);
 
-  const audioRef = publicAudioName || null;
+  const inputProps = {
+    book,
+    scenes,
+    audioFile:            publicAudioName || null,
+    backgroundMusicFile:  publicBgName    || null,
+    totalDurationInFrames: totalFrames,
+  };
 
   const composition = await selectComposition({
     serveUrl: bundleLocation,
     id: 'BookSummary',
-    inputProps: { book, scenes, audioFile: audioRef },
+    inputProps,
   });
 
   console.log(`Rendering ${totalFrames} frames @ ${fps}fps → ${outputPath}`);
@@ -98,20 +128,22 @@ async function main() {
     serveUrl: bundleLocation,
     codec: 'h264',
     outputLocation: outputPath,
-    inputProps: { book, scenes, audioFile: audioRef },
+    inputProps,
     timeoutInMilliseconds: 300000,
     onProgress: ({ progress }) => {
       process.stdout.write(`\rRendering: ${Math.round(progress * 100)}%   `);
     },
   });
 
-  // Clean up temp audio from public dir
+  // Clean up temp files from public dir
   if (publicAudioName) {
     await fs.promises.unlink(path.join(publicDir, publicAudioName)).catch(() => {});
   }
+  if (publicBgName) {
+    await fs.promises.unlink(path.join(publicDir, publicBgName)).catch(() => {});
+  }
 
   console.log(`\nDone → ${outputPath}`);
-  // Output path for parent process to read
   process.stdout.write(`\n__OUTPUT__:${outputPath}\n`);
 }
 

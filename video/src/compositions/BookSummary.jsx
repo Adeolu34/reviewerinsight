@@ -180,44 +180,61 @@ const OutroScene = ({ scene, book }) => {
   const fg      = book.cover?.fg || '#F5EFE4';
 
   const op       = fadeIn(frame, 0, fps * 0.6);
-  const urlSlide = interpolate(frame, [fps * 0.8, fps * 1.4], [20, 0], { extrapolateLeft:'clamp', extrapolateRight:'clamp' });
+  const urlSlide = interpolate(frame, [fps * 0.8, fps * 1.6], [30, 0], { extrapolateLeft:'clamp', extrapolateRight:'clamp', easing: Easing.out(Easing.cubic) });
+  const coverScale = spring({ frame: Math.max(0, frame - fps * 0.4), fps, config: { damping: 18, stiffness: 70 } });
+
+  // Strip URL from narration text so we can display it separately
+  const ctaText = scene.narration
+    .replace(/reviewerinsight\.com/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 
   return (
-    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:44, padding:'80px 60px' }}>
-      <div style={{ opacity:op, textAlign:'center' }}>
-        <div style={{ fontFamily:SERIF, fontSize:52, fontWeight:900, color:fg, marginBottom:18, lineHeight:1.15 }}>
-          Read the Full Review
-        </div>
-        <div style={{ transform:`translateY(${urlSlide}px)`, fontFamily:MONO, fontSize:28, fontWeight:700, color:ACCENT, letterSpacing:'.06em' }}>
-          reviewerinsight.com
-        </div>
-        <div style={{ marginTop:28, fontFamily:SANS, fontSize:20, color:fg, opacity:.55, lineHeight:1.5 }}>
-          {scene.narration.replace('reviewerinsight.com', '').replace(/\s{2,}/g, ' ').trim()}
-        </div>
+    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:40, padding:'80px 60px' }}>
+      <div style={{ opacity: op * 0.4, transform:`scale(${coverScale})` }}>
+        <CoverTile cover={book.cover} title={book.title} author={book.author} size={160} />
       </div>
 
-      <div style={{ opacity: op * 0.5 }}>
-        <CoverTile cover={book.cover} title={book.title} author={book.author} size={160} />
+      <div style={{ opacity:op, textAlign:'center', width:'100%' }}>
+        <div style={{ fontFamily:SERIF, fontSize:42, color:fg, lineHeight:1.45, marginBottom:32 }}>
+          {ctaText}
+        </div>
+
+        <div style={{ transform:`translateY(${urlSlide}px)` }}>
+          <div style={{ fontFamily:MONO, fontSize:14, fontWeight:700, letterSpacing:'.18em', textTransform:'uppercase', color:fg, opacity:.5, marginBottom:10 }}>
+            Full review at
+          </div>
+          <div style={{ fontFamily:MONO, fontSize:30, fontWeight:700, color:ACCENT, letterSpacing:'.04em' }}>
+            reviewerinsight.com
+          </div>
+        </div>
       </div>
     </AbsoluteFill>
   );
 };
 
 // ─── Main composition ────────────────────────────────────────────
-const BookSummary = ({ book, scenes, audioFile }) => {
-  const { fps } = useVideoConfig();
+const BookSummary = ({ book, scenes, audioFile, backgroundMusicFile, totalDurationInFrames }) => {
+  const { fps, durationInFrames } = useVideoConfig();
+  const totalFrames = totalDurationInFrames || durationInFrames;
 
+  // Build timeline; stretch the last scene to fill any remaining frames
   let cursor = 0;
-  const timeline = scenes.map(scene => {
-    const startFrame     = cursor;
-    const durationInFrames = Math.max(fps * 3, Math.round(scene.estimatedSeconds * fps));
-    cursor += durationInFrames;
-    return { ...scene, startFrame, durationInFrames };
+  const timeline = scenes.map((scene, i) => {
+    const isLast   = i === scenes.length - 1;
+    const startFrame = cursor;
+    const estimated  = Math.max(fps * 3, Math.round(scene.estimatedSeconds * fps));
+    const sceneFrames = isLast ? Math.max(estimated, totalFrames - cursor) : estimated;
+    cursor += sceneFrames;
+    return { ...scene, startFrame, durationInFrames: sceneFrames };
   });
 
   return (
     <AbsoluteFill>
       {audioFile && <Audio src={staticFile(audioFile)} />}
+      {backgroundMusicFile && (
+        <Audio src={staticFile(backgroundMusicFile)} volume={0.12} loop />
+      )}
 
       {timeline.map(scene => (
         <Sequence key={scene.id} from={scene.startFrame} durationInFrames={scene.durationInFrames}>
