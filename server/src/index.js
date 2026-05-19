@@ -72,7 +72,6 @@ async function startServer() {
   app.use('/api/authors', authorsRouter);
 
   // Video file download (served from disk)
-  const VideoJob = require('./models/VideoJob');
   const requireAdmin = require('./middleware/requireAdmin');
   const fs = require('fs');
   app.get('/videos/:id/download', requireAdmin, async (req, res, next) => {
