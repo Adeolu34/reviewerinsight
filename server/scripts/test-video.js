@@ -3,10 +3,10 @@
  *
  * Usage (from repo root):
  *   cd server
- *   node scripts/test-video.js              # test scripting + render with silent audio
- *   node scripts/test-video.js --tts        # also run real ElevenLabs TTS
- *   node scripts/test-video.js <bookId>     # test a specific book
- *   node scripts/test-video.js <bookId> --tts
+ *   node scripts/test-video.js              # test with ElevenLabs TTS (default)
+ *   node scripts/test-video.js --no-tts     # skip TTS, render silent
+ *   node scripts/test-video.js <bookId>     # test a specific book with TTS
+ *   node scripts/test-video.js <bookId> --no-tts
  */
 require('dotenv').config();
 
@@ -21,7 +21,7 @@ const VIDEO_OUTPUT_DIR = process.env.VIDEO_OUTPUT_DIR
   || path.join(__dirname, '..', '..', 'videos');
 
 const args    = process.argv.slice(2);
-const useTTS  = args.includes('--tts');
+const useTTS  = !args.includes('--no-tts');
 const bookArg = args.find(a => !a.startsWith('--'));
 
 // Tiny valid silent MP3 (44-byte MPEG frame) — used when skipping ElevenLabs
@@ -73,7 +73,7 @@ async function run() {
   if (useTTS) {
     const elevenKey = process.env.ELEVENLABS_API_KEY;
     if (!elevenKey || elevenKey.startsWith('your-')) {
-      console.error('\n--tts requires ELEVENLABS_API_KEY in .env');
+      console.error('\nELEVENLABS_API_KEY missing in .env — use --no-tts to skip voiceover');
       await mongoose.disconnect();
       process.exit(1);
     }
@@ -89,7 +89,7 @@ async function run() {
       process.exit(1);
     }
   } else {
-    console.log('\n[4/4] Skipping ElevenLabs — video will render without audio (use --tts for voice)');
+    console.log('\n[4/4] Skipping ElevenLabs (--no-tts) — video will render without voiceover');
   }
 
   // ── Step 3: Remotion render ──────────────────────────────────────────
