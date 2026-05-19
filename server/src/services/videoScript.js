@@ -62,7 +62,7 @@ Return this exact JSON structure:
     },
     {
       "id": "body",
-      "narration": "3 key ideas or moments from the book. Each idea gets 1-2 vivid sentences. Total ~40 seconds."
+      "narration": "3 key ideas from the book. Each idea is ONE punchy sentence — bold, vivid, no filler. Max 12 words per idea. Total ~25 seconds."
     },
     {
       "id": "verdict",

@@ -40,8 +40,9 @@ const WordReveal = ({ text, startFrame, wps = 3, fontSize, color, center = false
             transform: `translateY(${y}px)`,
             fontFamily: SERIF,
             fontSize,
+            fontWeight: 700,
             color,
-            lineHeight: 1.55,
+            lineHeight: 1.45,
             marginRight: i < words.length - 1 ? '0.26em' : 0,
           }}>
             {word}
@@ -232,8 +233,8 @@ const ContentScene = ({ scene, book, index }) => {
         <WordReveal
           text={scene.narration}
           startFrame={fps * 0.3}
-          wps={2.8}
-          fontSize={52}
+          wps={2.5}
+          fontSize={62}
           color={fg}
         />
       </div>
