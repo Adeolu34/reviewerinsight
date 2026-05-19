@@ -4458,13 +4458,29 @@ const VideosSection = () => {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      gap: 6
+      gap: 6,
+      flexWrap: 'wrap'
     }
-  }, j.videoPath && /*#__PURE__*/React.createElement(Btn, {
+  }, j.youtubeVideoId && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ok",
+    onClick: () => window.open(`https://youtu.be/${j.youtubeVideoId}`, '_blank')
+  }, "\u25B6 YouTube"), j.videoPath && !j.youtubeVideoId && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "ok",
     onClick: () => window.open(`/videos/${j._id}/download`, '_blank')
   }, "\u2B07 MP4"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    onClick: async () => {
+      try {
+        await AdminClient.uploadVideoToYoutube(j._id);
+        refreshAll();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+  }, "\u2191 YouTube")), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "ghost",
     onClick: () => handleDelete(j._id)

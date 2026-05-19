@@ -2072,9 +2072,18 @@ const VideosSection = () => {
                       {j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '—'}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {j.videoPath && (
-                          <Btn small variant="ok" onClick={() => window.open(`/videos/${j._id}/download`, '_blank')}>⬇ MP4</Btn>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {j.youtubeVideoId && (
+                          <Btn small variant="ok" onClick={() => window.open(`https://youtu.be/${j.youtubeVideoId}`, '_blank')}>▶ YouTube</Btn>
+                        )}
+                        {j.videoPath && !j.youtubeVideoId && (
+                          <>
+                            <Btn small variant="ok" onClick={() => window.open(`/videos/${j._id}/download`, '_blank')}>⬇ MP4</Btn>
+                            <Btn small variant="primary" onClick={async () => {
+                              try { await AdminClient.uploadVideoToYoutube(j._id); refreshAll(); }
+                              catch (e) { alert(e.message); }
+                            }}>↑ YouTube</Btn>
+                          </>
                         )}
                         <Btn small variant="ghost" onClick={() => handleDelete(j._id)}>✕</Btn>
                       </div>

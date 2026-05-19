@@ -278,6 +278,7 @@ const AdminClient = {
   getVideos(params = {})             { return this._fetch(`/videos?${new URLSearchParams(params)}`); },
   generateVideo(bookId)              { return this._fetch('/videos/generate', { method: 'POST', body: JSON.stringify({ bookId }) }); },
   generateVideoBatch(batchSize = 3)  { return this._fetch('/videos/batch', { method: 'POST', body: JSON.stringify({ batchSize }) }); },
+  uploadVideoToYoutube(id)           { return this._fetch(`/videos/${id}/upload-youtube`, { method: 'POST' }); },
   deleteVideo(id)                    { return this._fetch(`/videos/${id}`, { method: 'DELETE' }); },
 
   // Duplicates
