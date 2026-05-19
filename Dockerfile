@@ -25,7 +25,7 @@ RUN npm ci --omit=dev
 # Remotion video dependencies
 WORKDIR /app/video
 COPY video/package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 WORKDIR /app/server
 
