@@ -64,6 +64,55 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/youtube/callback (PUBLIC — Google redirects here) ──────────
+router.get('/youtube/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  const page = (ok, msg) => res.send(`<!DOCTYPE html><html>
+<head><title>YouTube ${ok ? 'Connected' : 'Error'}</title></head>
+<body style="font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#eee">
+<script>
+if(window.opener){window.opener.postMessage(${JSON.stringify(ok ? 'youtube-connected' : `youtube-error:${msg}`)},\'*\');window.close();}
+else{document.body.innerHTML='<h2 style="color:${ok ? '#10B981' : '#EF4444'}">${ok ? 'Connected! You can close this tab.' : 'Error: ' + msg}</h2>';}
+</script>
+</body></html>`);
+
+  if (error) return page(false, error);
+  if (!code) return page(false, 'no_code');
+
+  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+    return page(false, 'YOUTUBE_CLIENT_ID or YOUTUBE_CLIENT_SECRET not set');
+  }
+
+  const { google } = require('googleapis');
+  const AppSetting = require('../models/AppSetting');
+  const redirectUri = process.env.YOUTUBE_REDIRECT_URI
+    || `${req.protocol}://${req.get('host')}/api/admin/youtube/callback`;
+
+  const oauth2 = new google.auth.OAuth2(
+    process.env.YOUTUBE_CLIENT_ID,
+    process.env.YOUTUBE_CLIENT_SECRET,
+    redirectUri,
+  );
+
+  try {
+    const { tokens } = await oauth2.getToken(code.trim());
+    if (!tokens.refresh_token) {
+      return page(false, 'No refresh_token returned — revoke app access in Google and try again');
+    }
+    await AppSetting.findOneAndUpdate(
+      { key: 'youtube_refresh_token' },
+      { $set: { value: tokens.refresh_token } },
+      { upsert: true }
+    );
+    logger.info('[YouTube] Refresh token saved to database via OAuth callback');
+    return page(true, 'connected');
+  } catch (err) {
+    logger.error(`[YouTube] OAuth callback failed: ${err.message}`);
+    return page(false, err.message.slice(0, 120));
+  }
+});
+
 router.use(requireAdmin);
 
 // ─── POST /api/admin/trigger-agent ──────────────────────────────
@@ -862,6 +911,58 @@ router.get('/authors', async (req, res, next) => {
 router.post('/authors/:id/regenerate-bio', async (req, res, next) => {
   try {
     await Author.findByIdAndUpdate(req.params.id, { bioStatus: 'pending' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ─── YOUTUBE OAUTH ──────────────────────────────────────────────
+
+// GET /api/admin/youtube/status
+router.get('/youtube/status', async (req, res, next) => {
+  try {
+    const AppSetting = require('../models/AppSetting');
+    const [dbSetting] = await Promise.all([AppSetting.findOne({ key: 'youtube_refresh_token' })]);
+    const fromEnv = !!process.env.YOUTUBE_REFRESH_TOKEN;
+    const fromDb  = !!dbSetting?.value;
+    const redirectUri = process.env.YOUTUBE_REDIRECT_URI
+      || `${req.protocol}://${req.get('host')}/api/admin/youtube/callback`;
+    res.json({
+      connected:       fromEnv || fromDb,
+      source:          fromEnv ? 'env' : fromDb ? 'database' : null,
+      clientConfigured: !!(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET),
+      redirectUri,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/youtube/auth-url — returns the Google OAuth URL for the popup
+router.get('/youtube/auth-url', async (req, res, next) => {
+  try {
+    if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+      return res.status(400).json({ error: 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in your environment first' });
+    }
+    const { google } = require('googleapis');
+    const redirectUri = process.env.YOUTUBE_REDIRECT_URI
+      || `${req.protocol}://${req.get('host')}/api/admin/youtube/callback`;
+    const oauth2 = new google.auth.OAuth2(
+      process.env.YOUTUBE_CLIENT_ID,
+      process.env.YOUTUBE_CLIENT_SECRET,
+      redirectUri,
+    );
+    const authUrl = oauth2.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['https://www.googleapis.com/auth/youtube.upload'],
+      prompt: 'consent',
+    });
+    res.json({ authUrl, redirectUri });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/admin/youtube/disconnect — removes stored token
+router.delete('/youtube/disconnect', async (req, res, next) => {
+  try {
+    const AppSetting = require('../models/AppSetting');
+    await AppSetting.deleteOne({ key: 'youtube_refresh_token' });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

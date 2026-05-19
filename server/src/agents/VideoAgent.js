@@ -80,7 +80,7 @@ class VideoAgent {
       let videoUrl  = `/videos/${job._id}/stream`;
       let youtubeVideoId = null;
 
-      if (youtubeConfigured()) {
+      if (await youtubeConfigured()) {
         await job.updateOne({ status: 'uploading' });
         try {
           const tags = [
