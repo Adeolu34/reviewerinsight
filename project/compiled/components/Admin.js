@@ -3826,12 +3826,37 @@ const AuthorsSection = () => {
       fontFamily: T.mono,
       fontSize: 12
     }
-  }, "No authors found.", !stats?.total ? ' Run the populate script first.' : '') : /*#__PURE__*/React.createElement(Table, {
-    cols: ['Author', 'Nationality', 'Books', 'Genres', 'Status', 'Photo', '']
-  }, authors.map(a => /*#__PURE__*/React.createElement("tr", {
+  }, "No authors found.", !stats?.total ? ' Run the populate script first.' : '') : /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: `1px solid ${T.border}`,
+      borderRadius: 8,
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: '100%',
+      borderCollapse: 'collapse'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      background: T.hover
+    }
+  }, ['Author', 'Nationality', 'Books', 'Genres', 'Status', 'Photo', ''].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: {
+      padding: '10px 12px',
+      textAlign: 'left',
+      fontSize: 10,
+      fontWeight: 700,
+      fontFamily: T.mono,
+      textTransform: 'uppercase',
+      letterSpacing: '.08em',
+      color: T.muted
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, authors.map(a => /*#__PURE__*/React.createElement("tr", {
     key: a._id,
     style: {
-      borderBottom: `1px solid ${T.border}`
+      borderTop: `1px solid ${T.border}`
     }
   }, /*#__PURE__*/React.createElement("td", {
     style: {
@@ -3927,7 +3952,7 @@ const AuthorsSection = () => {
     variant: "ghost",
     disabled: regenerating === a._id,
     onClick: () => handleRegenerate(a._id, a.name)
-  }, regenerating === a._id ? '…' : '↺ Regen'))))), /*#__PURE__*/React.createElement(Pagination, {
+  }, regenerating === a._id ? '…' : '↺ Regen'))))))), /*#__PURE__*/React.createElement(Pagination, {
     page: page,
     totalPages: data?.pages,
     onChange: setPage

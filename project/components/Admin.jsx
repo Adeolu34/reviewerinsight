@@ -1787,34 +1787,45 @@ const AuthorsSection = () => {
             No authors found.{!stats?.total ? ' Run the populate script first.' : ''}
           </div>
         ) : (
-          <Table cols={['Author', 'Nationality', 'Books', 'Genres', 'Status', 'Photo', '']}>
-            {authors.map(a => (
-              <tr key={a._id} style={{ borderBottom: `1px solid ${T.border}` }}>
-                <td style={{ padding: '10px 12px' }}>
-                  <div style={{ fontSize: 14, fontFamily: T.serif, fontWeight: 700, color: T.text }}>{a.name}</div>
-                  {a.shortBio && <div style={{ fontSize: 11, fontFamily: T.sans, color: T.dim, marginTop: 2, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.shortBio}</div>}
-                </td>
-                <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: T.mono, color: T.muted }}>{a.nationality || '—'}</td>
-                <td style={{ padding: '10px 12px', fontSize: 13, fontFamily: T.mono, color: T.text, textAlign: 'center' }}>{a.bookCount}</td>
-                <td style={{ padding: '10px 12px', fontSize: 11, fontFamily: T.mono, color: T.muted }}>{(a.genres || []).slice(0, 2).join(', ') || '—'}</td>
-                <td style={{ padding: '10px 12px' }}>
-                  <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.06em', background: BIO_STATUS_COLORS[a.bioStatus] || T.dim, color: '#fff' }}>
-                    {a.bioStatus}
-                  </span>
-                </td>
-                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                  {a.photoUrl
-                    ? <img src={a.photoUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${T.border}` }} onError={e => { e.target.style.display = 'none'; }} />
-                    : <span style={{ fontSize: 11, color: T.dim, fontFamily: T.mono }}>—</span>}
-                </td>
-                <td style={{ padding: '10px 12px' }}>
-                  <Btn small variant="ghost" disabled={regenerating === a._id} onClick={() => handleRegenerate(a._id, a.name)}>
-                    {regenerating === a._id ? '…' : '↺ Regen'}
-                  </Btn>
-                </td>
-              </tr>
-            ))}
-          </Table>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: T.hover }}>
+                  {['Author', 'Nationality', 'Books', 'Genres', 'Status', 'Photo', ''].map(h => (
+                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.08em', color: T.muted }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {authors.map(a => (
+                  <tr key={a._id} style={{ borderTop: `1px solid ${T.border}` }}>
+                    <td style={{ padding: '10px 12px' }}>
+                      <div style={{ fontSize: 14, fontFamily: T.serif, fontWeight: 700, color: T.text }}>{a.name}</div>
+                      {a.shortBio && <div style={{ fontSize: 11, fontFamily: T.sans, color: T.dim, marginTop: 2, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.shortBio}</div>}
+                    </td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: T.mono, color: T.muted }}>{a.nationality || '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 13, fontFamily: T.mono, color: T.text, textAlign: 'center' }}>{a.bookCount}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 11, fontFamily: T.mono, color: T.muted }}>{(a.genres || []).slice(0, 2).join(', ') || '—'}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700, fontFamily: T.mono, textTransform: 'uppercase', letterSpacing: '.06em', background: BIO_STATUS_COLORS[a.bioStatus] || T.dim, color: '#fff' }}>
+                        {a.bioStatus}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      {a.photoUrl
+                        ? <img src={a.photoUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${T.border}` }} onError={e => { e.target.style.display = 'none'; }} />
+                        : <span style={{ fontSize: 11, color: T.dim, fontFamily: T.mono }}>—</span>}
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <Btn small variant="ghost" disabled={regenerating === a._id} onClick={() => handleRegenerate(a._id, a.name)}>
+                        {regenerating === a._id ? '…' : '↺ Regen'}
+                      </Btn>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         <Pagination page={page} totalPages={data?.pages} onChange={setPage} />
       </Card>
