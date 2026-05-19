@@ -268,6 +268,13 @@ const AdminClient = {
   triggerAuthorBios(batchSize = 50) { return this._fetch('/trigger-agent', { method: 'POST', body: JSON.stringify({ editor: 'Sofia Kwon', batchSize }) }); },
   seedAuthors()           { return this._fetch('/seed-authors', { method: 'POST' }); },
 
+  // Videos
+  getVideoStats()                    { return this._fetch('/video-stats'); },
+  getVideos(params = {})             { return this._fetch(`/videos?${new URLSearchParams(params)}`); },
+  generateVideo(bookId)              { return this._fetch('/videos/generate', { method: 'POST', body: JSON.stringify({ bookId }) }); },
+  generateVideoBatch(batchSize = 3)  { return this._fetch('/videos/batch', { method: 'POST', body: JSON.stringify({ batchSize }) }); },
+  deleteVideo(id)                    { return this._fetch(`/videos/${id}`, { method: 'DELETE' }); },
+
   // Duplicates
   getDuplicates()         { return this._fetch('/duplicates'); },
   mergeDuplicates(keepId, removeIds) {

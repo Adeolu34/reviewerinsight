@@ -32,4 +32,7 @@ module.exports = {
   adminApiKey: process.env.ADMIN_API_KEY,
   jwtSecret: process.env.JWT_SECRET || process.env.ADMIN_API_KEY || 'reviewer-insight-default-secret',
   nodeEnv: process.env.NODE_ENV || 'development',
+  elevenLabsKey: process.env.ELEVENLABS_API_KEY,
+  elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID,
+  videoOutputDir: process.env.VIDEO_OUTPUT_DIR,
 };

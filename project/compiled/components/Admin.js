@@ -3958,6 +3958,347 @@ const AuthorsSection = () => {
     onChange: setPage
   })));
 };
+
+// ─── SECTION: Videos ─────────────────────────────────────────────
+const VIDEO_STATUS_COLORS = {
+  done: T.ok,
+  failed: T.err,
+  rendering: '#7C6FCF',
+  tts: T.warn,
+  scripting: T.warn,
+  queued: T.dim
+};
+const VideosSection = () => {
+  const [statusFilter, setStatusFilter] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const [batchSize, setBatchSize] = React.useState(3);
+  const [running, setRunning] = React.useState(false);
+  const [runMsg, setRunMsg] = React.useState('');
+  const [genBookId, setGenBookId] = React.useState('');
+  const {
+    data: stats,
+    refresh: refreshStats
+  } = useAdminApi(() => AdminClient.getVideoStats());
+  const {
+    data,
+    loading,
+    refresh
+  } = useAdminApi(() => AdminClient.getVideos({
+    page,
+    limit: 20,
+    ...(statusFilter ? {
+      status: statusFilter
+    } : {})
+  }), [page, statusFilter]);
+  const refreshAll = () => {
+    refreshStats();
+    refresh();
+  };
+  const handleBatch = async () => {
+    setRunning(true);
+    setRunMsg('');
+    try {
+      const r = await AdminClient.generateVideoBatch(batchSize);
+      setRunMsg(`✓ ${r.message}`);
+      setTimeout(refreshAll, 5000);
+    } catch (e) {
+      setRunMsg(`✗ ${e.message}`);
+    } finally {
+      setRunning(false);
+    }
+  };
+  const handleSingle = async () => {
+    if (!genBookId.trim()) return;
+    setRunning(true);
+    setRunMsg('');
+    try {
+      const r = await AdminClient.generateVideo(genBookId.trim());
+      setRunMsg(`✓ ${r.message}`);
+      setGenBookId('');
+      setTimeout(refreshAll, 5000);
+    } catch (e) {
+      setRunMsg(`✗ ${e.message}`);
+    } finally {
+      setRunning(false);
+    }
+  };
+  const handleDelete = async id => {
+    if (!confirm('Delete this video job and its files?')) return;
+    try {
+      await AdminClient.deleteVideo(id);
+      refreshAll();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+  const jobs = data?.jobs || [];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(5, 1fr)',
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement(Metric, {
+    label: "Total Jobs",
+    value: fmtNum(stats?.total || 0)
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Done",
+    value: fmtNum(stats?.done || 0),
+    color: T.ok
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Rendering",
+    value: fmtNum(stats?.rendering || 0),
+    color: "#7C6FCF"
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Queued",
+    value: fmtNum(stats?.queued || 0),
+    color: T.warn
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Failed",
+    value: fmtNum(stats?.failed || 0),
+    color: stats?.failed > 0 ? T.err : T.text
+  })), /*#__PURE__*/React.createElement(Card, {
+    title: "Generate Videos"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 13,
+      color: T.muted
+    }
+  }, "Batch next"), /*#__PURE__*/React.createElement(Select, {
+    value: batchSize,
+    onChange: v => setBatchSize(Number(v)),
+    style: {
+      width: 110
+    }
+  }, [1, 2, 3, 5, 10].map(n => /*#__PURE__*/React.createElement("option", {
+    key: n,
+    value: n
+  }, n, " video", n > 1 ? 's' : ''))), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ok",
+    disabled: running,
+    onClick: handleBatch
+  }, running ? 'Starting…' : '▶ Run Batch')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 13,
+      color: T.muted
+    }
+  }, "Single book ID"), /*#__PURE__*/React.createElement("input", {
+    value: genBookId,
+    onChange: e => setGenBookId(e.target.value),
+    placeholder: "MongoDB _id",
+    style: {
+      background: T.inputBg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 6,
+      padding: '8px 12px',
+      fontFamily: T.mono,
+      fontSize: 12,
+      color: T.text,
+      width: 260
+    }
+  }), /*#__PURE__*/React.createElement(Btn, {
+    variant: "ghost",
+    disabled: running || !genBookId.trim(),
+    onClick: handleSingle
+  }, "Generate")), runMsg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: runMsg.startsWith('✓') ? T.ok : T.err
+    }
+  }, runMsg), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontFamily: T.sans,
+      color: T.dim,
+      lineHeight: 1.6
+    }
+  }, "Each video: AI script \u2192 ElevenLabs TTS \u2192 Remotion render \u2192 MP4.", /*#__PURE__*/React.createElement("br", null), "Rendering takes 2\u20135 minutes per video. Status updates every 5 seconds."))), /*#__PURE__*/React.createElement(Card, {
+    title: "Video Jobs",
+    actions: /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(Select, {
+      value: statusFilter,
+      onChange: v => {
+        setStatusFilter(v);
+        setPage(1);
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "All statuses"), ['queued', 'scripting', 'tts', 'rendering', 'done', 'failed'].map(s => /*#__PURE__*/React.createElement("option", {
+      key: s,
+      value: s
+    }, s))), /*#__PURE__*/React.createElement(Btn, {
+      small: true,
+      variant: "ghost",
+      onClick: refreshAll
+    }, "\u21BB Refresh"))
+  }, loading ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: 30,
+      color: T.muted,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, "Loading\u2026") : jobs.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: 30,
+      color: T.dim,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, "No video jobs yet.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: `1px solid ${T.border}`,
+      borderRadius: 8,
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: '100%',
+      borderCollapse: 'collapse'
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      background: T.hover
+    }
+  }, ['Book', 'Status', 'Duration', 'Video Title', 'Created', ''].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: {
+      padding: '10px 12px',
+      textAlign: 'left',
+      fontSize: 10,
+      fontWeight: 700,
+      fontFamily: T.mono,
+      textTransform: 'uppercase',
+      letterSpacing: '.08em',
+      color: T.muted
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, jobs.map(j => /*#__PURE__*/React.createElement("tr", {
+    key: j._id,
+    style: {
+      borderTop: `1px solid ${T.border}`
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontFamily: T.serif,
+      fontWeight: 700,
+      color: T.text
+    }
+  }, j.bookId?.title || '—'), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontFamily: T.mono,
+      color: T.dim
+    }
+  }, j.bookId?.author)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block',
+      padding: '3px 10px',
+      borderRadius: 12,
+      fontSize: 10,
+      fontWeight: 700,
+      fontFamily: T.mono,
+      textTransform: 'uppercase',
+      letterSpacing: '.06em',
+      background: VIDEO_STATUS_COLORS[j.status] || T.dim,
+      color: '#fff'
+    }
+  }, j.status), j.error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: T.err,
+      fontFamily: T.mono,
+      marginTop: 4,
+      maxWidth: 200
+    }
+  }, j.error.slice(0, 60))), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      fontFamily: T.mono,
+      fontSize: 12,
+      color: T.muted
+    }
+  }, j.durationMs ? `${Math.round(j.durationMs / 1000)}s` : j.script?.totalSeconds ? `~${j.script.totalSeconds}s` : '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      fontFamily: T.sans,
+      fontSize: 12,
+      color: T.text,
+      maxWidth: 220
+    }
+  }, j.script?.title || '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px',
+      fontFamily: T.mono,
+      fontSize: 11,
+      color: T.dim
+    }
+  }, j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '—'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: '10px 12px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6
+    }
+  }, j.videoPath && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ok",
+    onClick: () => window.open(`/videos/${j._id}/download`, '_blank')
+  }, "\u2B07 MP4"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => handleDelete(j._id)
+  }, "\u2715")))))))), /*#__PURE__*/React.createElement(Pagination, {
+    page: page,
+    totalPages: data?.pages,
+    onChange: setPage
+  })));
+};
 const SECTIONS = [{
   id: 'overview',
   label: 'Overview',
@@ -3974,6 +4315,10 @@ const SECTIONS = [{
   id: 'authors',
   label: 'Authors',
   icon: '✍'
+}, {
+  id: 'videos',
+  label: 'Videos',
+  icon: '▷'
 }, {
   id: 'scraper',
   label: 'Scraper',
@@ -4017,6 +4362,7 @@ const Admin = ({
     runs: RunsSection,
     books: BooksSection,
     authors: AuthorsSection,
+    videos: VideosSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,

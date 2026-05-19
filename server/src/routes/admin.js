@@ -6,6 +6,7 @@ const Book = require('../models/Book');
 const Author = require('../models/Author');
 const AdminUser = require('../models/AdminUser');
 const ScrapedBook = require('../models/ScrapedBook');
+const VideoJob = require('../models/VideoJob');
 const config = require('../config/env');
 const { normalize } = require('../utils/dedup');
 const logger = require('../utils/logger');
@@ -861,6 +862,93 @@ router.get('/authors', async (req, res, next) => {
 router.post('/authors/:id/regenerate-bio', async (req, res, next) => {
   try {
     await Author.findByIdAndUpdate(req.params.id, { bioStatus: 'pending' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ─── VIDEO JOBS ─────────────────────────────────────────────────
+
+// GET /api/admin/videos — list video jobs with pagination
+router.get('/videos', requireAdmin, async (req, res, next) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 20);
+    const status = req.query.status || null;
+
+    const filter = status ? { status } : {};
+    const [jobs, total] = await Promise.all([
+      VideoJob.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('bookId', 'title author genre rating')
+        .lean(),
+      VideoJob.countDocuments(filter),
+    ]);
+
+    res.json({ jobs, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/video-stats — summary counts
+router.get('/video-stats', requireAdmin, async (req, res, next) => {
+  try {
+    const counts = await VideoJob.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+    const stats = { total: 0, queued: 0, scripting: 0, tts: 0, rendering: 0, done: 0, failed: 0 };
+    for (const { _id, count } of counts) {
+      stats[_id] = count;
+      stats.total += count;
+    }
+    res.json(stats);
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/videos/generate — trigger video for a specific book
+router.post('/videos/generate', requireAdmin, async (req, res, next) => {
+  try {
+    const { bookId } = req.body;
+    if (!bookId) return res.status(400).json({ error: 'bookId required' });
+
+    // Start async — don't await (rendering takes minutes)
+    const VideoAgent = require('../agents/VideoAgent');
+    const agent = new VideoAgent();
+    agent.generateForBook(bookId).catch(err => {
+      logger.error(`[admin] Video generation failed for ${bookId}: ${err.message}`);
+    });
+
+    res.json({ ok: true, message: 'Video generation started', bookId });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/videos/batch — generate next N videos
+router.post('/videos/batch', requireAdmin, async (req, res, next) => {
+  try {
+    const batchSize = Math.min(20, parseInt(req.body.batchSize) || 3);
+
+    const VideoAgent = require('../agents/VideoAgent');
+    const agent = new VideoAgent();
+    agent.runBatch(batchSize).catch(err => {
+      logger.error(`[admin] Video batch failed: ${err.message}`);
+    });
+
+    res.json({ ok: true, message: `Batch of ${batchSize} videos started` });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/admin/videos/:id — delete a video job (and its files)
+router.delete('/videos/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const job = await VideoJob.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const fs = require('fs');
+    for (const filePath of [job.audioPath, job.videoPath].filter(Boolean)) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+
+    await job.deleteOne();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

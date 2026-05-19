@@ -61,6 +61,23 @@ async function startServer() {
   app.use('/api/recommendations', recommendationsRouter);
   app.use('/api/authors', authorsRouter);
 
+  // Video file download (served from disk)
+  const VideoJob = require('./models/VideoJob');
+  const requireAdmin = require('./middleware/requireAdmin');
+  const path = require('path');
+  app.get('/videos/:id/download', requireAdmin, async (req, res, next) => {
+    try {
+      const job = await VideoJob.findById(req.params.id).lean();
+      if (!job || !job.videoPath) return res.status(404).json({ error: 'Video not found' });
+      const fs = require('fs');
+      if (!fs.existsSync(job.videoPath)) return res.status(404).json({ error: 'File not on disk' });
+      const filename = path.basename(job.videoPath);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'video/mp4');
+      res.sendFile(job.videoPath);
+    } catch (err) { next(err); }
+  });
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
