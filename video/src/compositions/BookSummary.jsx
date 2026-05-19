@@ -4,30 +4,22 @@ const {
 } = require('remotion');
 const React = require('react');
 
-// ─── Design tokens (matches site theme) ──────────────────────────
 const ACCENT = '#E8432C';
 const SERIF  = '"DM Serif Display", Georgia, serif';
 const MONO   = '"JetBrains Mono", monospace';
 const SANS   = '"Space Grotesk", sans-serif';
 
-// ─── Utility: fade in/out a value ────────────────────────────────
 function fadeIn(frame, start, duration, easing = Easing.ease) {
   return interpolate(frame, [start, start + duration], [0, 1], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing,
   });
 }
-function fadeOut(frame, end, duration) {
-  return interpolate(frame, [end - duration, end], [1, 0], {
-    extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
-  });
-}
 
-// ─── Cover tile (matches site's generated covers) ────────────────
 const CoverTile = ({ cover, title, author, size = 260 }) => {
-  const bg     = cover?.bg    || '#141210';
-  const fg     = cover?.fg    || '#F5EFE4';
-  const motif  = cover?.motif || 'bars';
-  const h      = Math.round(size * 1.4);
+  const bg    = cover?.bg    || '#141210';
+  const fg    = cover?.fg    || '#F5EFE4';
+  const motif = cover?.motif || 'bars';
+  const h     = Math.round(size * 1.4);
 
   const motifs = {
     bars: (
@@ -41,7 +33,7 @@ const CoverTile = ({ cover, title, author, size = 260 }) => {
   };
 
   return (
-    <div style={{ position:'relative', width:size, height:h, background:bg, color:fg, overflow:'hidden', borderRadius:4, boxShadow:'0 24px 60px -16px rgba(0,0,0,0.6)' }}>
+    <div style={{ position:'relative', width:size, height:h, background:bg, color:fg, overflow:'hidden', borderRadius:6, boxShadow:'0 32px 80px -20px rgba(0,0,0,0.7)' }}>
       {motifs[motif]}
       <div style={{ position:'absolute', top:0, left:0, right:0, height:'30%', background:`linear-gradient(180deg,${fg}08,transparent)` }} />
       <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:20 }}>
@@ -53,48 +45,50 @@ const CoverTile = ({ cover, title, author, size = 260 }) => {
   );
 };
 
-// ─── Scene: Intro ────────────────────────────────────────────────
-const IntroScene = ({ book, durationInFrames }) => {
-  const frame  = useCurrentFrame();
+// ─── Scene: Intro — cover above, title below ─────────────────────
+const IntroScene = ({ book }) => {
+  const frame   = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const bg     = book.cover?.bg || '#141210';
-  const fg     = book.cover?.fg || '#F5EFE4';
+  const bg      = book.cover?.bg || '#141210';
+  const fg      = book.cover?.fg || '#F5EFE4';
 
   const coverScale = spring({ frame, fps, config: { damping: 18, stiffness: 80 } });
   const titleOp    = fadeIn(frame, fps * 1.5, fps * 0.8);
   const barWidth   = interpolate(frame, [fps * 2, fps * 2.8], [0, 100], { extrapolateLeft:'clamp', extrapolateRight:'clamp' });
 
   return (
-    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:40 }}>
+    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:52, padding:'80px 60px' }}>
       <div style={{ transform:`scale(${coverScale})`, transformOrigin:'center' }}>
-        <CoverTile cover={book.cover} title={book.title} author={book.author} size={280} />
+        <CoverTile cover={book.cover} title={book.title} author={book.author} size={300} />
       </div>
-      <div style={{ opacity: titleOp, textAlign:'center', color: fg, maxWidth: 700 }}>
-        <div style={{ height: 3, background: ACCENT, width:`${barWidth}%`, margin:'0 auto 20px', transition:'width .1s' }} />
-        <div style={{ fontFamily: MONO, fontSize: 15, fontWeight:600, letterSpacing:'.15em', textTransform:'uppercase', opacity:.6, marginBottom: 8 }}>
+
+      <div style={{ opacity: titleOp, textAlign:'center', color: fg, width:'100%' }}>
+        <div style={{ height: 3, background: ACCENT, width:`${barWidth}%`, margin:'0 auto 22px' }} />
+        <div style={{ fontFamily: MONO, fontSize: 16, fontWeight:600, letterSpacing:'.15em', textTransform:'uppercase', opacity:.6, marginBottom: 10 }}>
           {book.genre} · {book.year || ''}
         </div>
-        <div style={{ fontFamily: SERIF, fontSize: 42, fontWeight: 900, lineHeight: 1.1 }}>{book.title}</div>
-        <div style={{ fontFamily: MONO, fontSize: 16, marginTop: 12, opacity:.65, letterSpacing:'.06em' }}>by {book.author}</div>
+        <div style={{ fontFamily: SERIF, fontSize: 58, fontWeight: 900, lineHeight: 1.1 }}>{book.title}</div>
+        <div style={{ fontFamily: MONO, fontSize: 18, marginTop: 16, opacity:.65, letterSpacing:'.06em' }}>by {book.author}</div>
       </div>
     </AbsoluteFill>
   );
 };
 
-// ─── Scene: Content (hook / body / verdict) ──────────────────────
+// ─── Scene: Content (hook / body) ────────────────────────────────
 const ContentScene = ({ scene, book, index }) => {
-  const frame  = useCurrentFrame();
+  const frame   = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const bg     = book.cover?.bg || '#141210';
-  const fg     = book.cover?.fg || '#F5EFE4';
+  const bg      = book.cover?.bg || '#141210';
+  const fg      = book.cover?.fg || '#F5EFE4';
 
-  const SCENE_LABELS = { hook:'Why This Book', body:'Key Ideas', verdict:'The Verdict' };
+  const SCENE_LABELS = { hook:'Why This Book', body:'Key Ideas' };
   const label = SCENE_LABELS[scene.id] || scene.id;
 
-  const op    = fadeIn(frame, 0, fps * 0.5);
-  const slideY = interpolate(frame, [0, fps * 0.5], [30, 0], { extrapolateLeft:'clamp', extrapolateRight:'clamp', easing: Easing.out(Easing.cubic) });
+  const op     = fadeIn(frame, 0, fps * 0.5);
+  const slideY = interpolate(frame, [0, fps * 0.5], [40, 0], {
+    extrapolateLeft:'clamp', extrapolateRight:'clamp', easing: Easing.out(Easing.cubic),
+  });
 
-  // Split body text into visual paragraphs (split on ". " for rhythm)
   const paragraphs = scene.narration
     .split(/(?<=\.) (?=[A-Z])/)
     .reduce((acc, sentence, i) => {
@@ -110,24 +104,19 @@ const ContentScene = ({ scene, book, index }) => {
   );
 
   return (
-    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 120px' }}>
-      {/* Left accent stripe */}
-      <div style={{ position:'absolute', left:0, top:0, bottom:0, width:6, background: ACCENT, opacity:.9 }} />
+    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'100px 60px' }}>
+      {/* Top accent bar */}
+      <div style={{ position:'absolute', left:0, top:0, right:0, height:6, background: ACCENT, opacity:.9 }} />
 
-      {/* Small cover in corner */}
-      <div style={{ position:'absolute', bottom: 48, right: 60, opacity:.35 }}>
-        <CoverTile cover={book.cover} title={book.title} author={book.author} size={90} />
-      </div>
-
-      <div style={{ opacity:op, transform:`translateY(${slideY}px)`, width:'100%', maxWidth:900 }}>
-        <div style={{ fontFamily:MONO, fontSize:13, fontWeight:700, letterSpacing:'.18em', textTransform:'uppercase', color:ACCENT, marginBottom:24 }}>
+      <div style={{ opacity:op, transform:`translateY(${slideY}px)`, width:'100%' }}>
+        <div style={{ fontFamily:MONO, fontSize:14, fontWeight:700, letterSpacing:'.18em', textTransform:'uppercase', color:ACCENT, marginBottom:30 }}>
           {label}
         </div>
 
         {paragraphs.map((para, i) => (
           <div key={i} style={{
-            fontFamily: SERIF, fontSize: 36, lineHeight:1.45, color: fg,
-            marginBottom: 24,
+            fontFamily: SERIF, fontSize: 44, lineHeight: 1.5, color: fg,
+            marginBottom: 30,
             opacity: i === activePara ? 1 : (i < activePara ? 0.3 : 0.15),
             transition: 'opacity .3s',
           }}>
@@ -137,9 +126,9 @@ const ContentScene = ({ scene, book, index }) => {
       </div>
 
       {/* Progress dots */}
-      <div style={{ position:'absolute', bottom:36, left:'50%', transform:'translateX(-50%)', display:'flex', gap:8 }}>
+      <div style={{ position:'absolute', bottom:52, left:'50%', transform:'translateX(-50%)', display:'flex', gap:10 }}>
         {[0,1,2,3].map(i => (
-          <div key={i} style={{ width:8, height:8, borderRadius:'50%', background: i === index ? ACCENT : fg, opacity: i === index ? 1 : 0.2 }} />
+          <div key={i} style={{ width:10, height:10, borderRadius:'50%', background: i === index ? ACCENT : fg, opacity: i === index ? 1 : 0.2 }} />
         ))}
       </div>
     </AbsoluteFill>
@@ -148,35 +137,34 @@ const ContentScene = ({ scene, book, index }) => {
 
 // ─── Scene: Verdict ───────────────────────────────────────────────
 const VerdictScene = ({ scene, book }) => {
-  const frame  = useCurrentFrame();
+  const frame   = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const bg     = book.cover?.bg || '#141210';
-  const fg     = book.cover?.fg || '#F5EFE4';
+  const bg      = book.cover?.bg || '#141210';
+  const fg      = book.cover?.fg || '#F5EFE4';
 
   const stars  = Math.round(book.rating || 4);
   const op     = fadeIn(frame, 0, fps * 0.5);
   const scaleV = spring({ frame: Math.max(0, frame - fps * 0.3), fps, config: { damping: 14, stiffness: 100 } });
 
   return (
-    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 120px' }}>
-      <div style={{ position:'absolute', left:0, top:0, bottom:0, width:6, background: ACCENT }} />
+    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', padding:'100px 60px' }}>
+      <div style={{ position:'absolute', left:0, top:0, right:0, height:6, background: ACCENT }} />
 
-      <div style={{ opacity:op, textAlign:'center', maxWidth:800 }}>
-        <div style={{ fontFamily:MONO, fontSize:13, fontWeight:700, letterSpacing:'.18em', textTransform:'uppercase', color:ACCENT, marginBottom:28 }}>
+      <div style={{ opacity:op, textAlign:'center', width:'100%' }}>
+        <div style={{ fontFamily:MONO, fontSize:14, fontWeight:700, letterSpacing:'.18em', textTransform:'uppercase', color:ACCENT, marginBottom:36 }}>
           The Verdict
         </div>
 
-        {/* Stars */}
-        <div style={{ transform:`scale(${scaleV})`, transformOrigin:'center', marginBottom:32 }}>
-          <div style={{ display:'flex', justifyContent:'center', gap:12 }}>
+        <div style={{ transform:`scale(${scaleV})`, transformOrigin:'center', marginBottom:44 }}>
+          <div style={{ display:'flex', justifyContent:'center', gap:16 }}>
             {[...Array(5)].map((_,i) => (
-              <div key={i} style={{ fontSize:42, color: i < stars ? ACCENT : fg, opacity: i < stars ? 1 : 0.2 }}>★</div>
+              <div key={i} style={{ fontSize:58, color: i < stars ? ACCENT : fg, opacity: i < stars ? 1 : 0.2 }}>★</div>
             ))}
           </div>
-          <div style={{ fontFamily:MONO, fontSize:16, color:fg, opacity:.5, marginTop:8 }}>{book.rating || 4}/5</div>
+          <div style={{ fontFamily:MONO, fontSize:18, color:fg, opacity:.5, marginTop:12 }}>{book.rating || 4}/5</div>
         </div>
 
-        <div style={{ fontFamily:SERIF, fontSize:30, lineHeight:1.5, color:fg }}>
+        <div style={{ fontFamily:SERIF, fontSize:40, lineHeight:1.55, color:fg }}>
           {scene.narration}
         </div>
       </div>
@@ -186,28 +174,30 @@ const VerdictScene = ({ scene, book }) => {
 
 // ─── Scene: Outro ────────────────────────────────────────────────
 const OutroScene = ({ scene, book }) => {
-  const frame  = useCurrentFrame();
+  const frame   = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const bg     = book.cover?.bg || '#141210';
-  const fg     = book.cover?.fg || '#F5EFE4';
+  const bg      = book.cover?.bg || '#141210';
+  const fg      = book.cover?.fg || '#F5EFE4';
 
-  const op      = fadeIn(frame, 0, fps * 0.6);
+  const op       = fadeIn(frame, 0, fps * 0.6);
   const urlSlide = interpolate(frame, [fps * 0.8, fps * 1.4], [20, 0], { extrapolateLeft:'clamp', extrapolateRight:'clamp' });
 
   return (
-    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:32 }}>
+    <AbsoluteFill style={{ background: bg, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:44, padding:'80px 60px' }}>
       <div style={{ opacity:op, textAlign:'center' }}>
-        <div style={{ fontFamily:SERIF, fontSize:38, color:fg, marginBottom:16 }}>Read the Full Review</div>
-        <div style={{ transform:`translateY(${urlSlide}px)`, fontFamily:MONO, fontSize:20, fontWeight:700, color:ACCENT, letterSpacing:'.06em' }}>
+        <div style={{ fontFamily:SERIF, fontSize:52, fontWeight:900, color:fg, marginBottom:18, lineHeight:1.15 }}>
+          Read the Full Review
+        </div>
+        <div style={{ transform:`translateY(${urlSlide}px)`, fontFamily:MONO, fontSize:28, fontWeight:700, color:ACCENT, letterSpacing:'.06em' }}>
           reviewerinsight.com
         </div>
-        <div style={{ marginTop:24, fontFamily:SANS, fontSize:16, color:fg, opacity:.55 }}>
-          {scene.narration.replace('reviewerinsight.com', '').trim()}
+        <div style={{ marginTop:28, fontFamily:SANS, fontSize:20, color:fg, opacity:.55, lineHeight:1.5 }}>
+          {scene.narration.replace('reviewerinsight.com', '').replace(/\s{2,}/g, ' ').trim()}
         </div>
       </div>
 
-      <div style={{ opacity: op * 0.4 }}>
-        <CoverTile cover={book.cover} title={book.title} author={book.author} size={140} />
+      <div style={{ opacity: op * 0.5 }}>
+        <CoverTile cover={book.cover} title={book.title} author={book.author} size={160} />
       </div>
     </AbsoluteFill>
   );
@@ -217,34 +207,27 @@ const OutroScene = ({ scene, book }) => {
 const BookSummary = ({ book, scenes, audioFile }) => {
   const { fps } = useVideoConfig();
 
-  // Build scene timeline: each scene starts where the previous one ended
   let cursor = 0;
   const timeline = scenes.map(scene => {
-    const startFrame = cursor;
+    const startFrame     = cursor;
     const durationInFrames = Math.max(fps * 3, Math.round(scene.estimatedSeconds * fps));
     cursor += durationInFrames;
     return { ...scene, startFrame, durationInFrames };
   });
 
-  const contentScenes = timeline.filter(s => ['hook','body'].includes(s.id));
-
   return (
     <AbsoluteFill>
       {audioFile && <Audio src={staticFile(audioFile)} />}
 
-      {timeline.map(scene => {
-        const idx = contentScenes.findIndex(s => s.id === scene.id);
-
-        return (
-          <Sequence key={scene.id} from={scene.startFrame} durationInFrames={scene.durationInFrames}>
-            {scene.id === 'intro'   && <IntroScene   book={book} durationInFrames={scene.durationInFrames} />}
-            {scene.id === 'hook'    && <ContentScene scene={scene} book={book} index={1} />}
-            {scene.id === 'body'    && <ContentScene scene={scene} book={book} index={2} />}
-            {scene.id === 'verdict' && <VerdictScene scene={scene} book={book} />}
-            {scene.id === 'outro'   && <OutroScene   scene={scene} book={book} />}
-          </Sequence>
-        );
-      })}
+      {timeline.map(scene => (
+        <Sequence key={scene.id} from={scene.startFrame} durationInFrames={scene.durationInFrames}>
+          {scene.id === 'intro'   && <IntroScene   book={book} />}
+          {scene.id === 'hook'    && <ContentScene scene={scene} book={book} index={1} />}
+          {scene.id === 'body'    && <ContentScene scene={scene} book={book} index={2} />}
+          {scene.id === 'verdict' && <VerdictScene scene={scene} book={book} />}
+          {scene.id === 'outro'   && <OutroScene   scene={scene} book={book} />}
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };

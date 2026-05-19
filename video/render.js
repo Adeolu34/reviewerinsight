@@ -12,6 +12,24 @@ const { bundle }      = require('@remotion/bundler');
 const { renderMedia, selectComposition } = require('@remotion/renderer');
 const path = require('path');
 const fs   = require('fs');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
+
+async function getAudioDurationSecs(filePath) {
+  const ffprobe = path.join(__dirname, 'node_modules', '@remotion', 'compositor-win32-x64-msvc', 'ffprobe.exe');
+  if (!fs.existsSync(ffprobe)) return null;
+  try {
+    const { stdout } = await execFileAsync(ffprobe, [
+      '-v', 'error', '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1', filePath,
+    ]);
+    const secs = parseFloat(stdout.trim());
+    return isNaN(secs) ? null : secs;
+  } catch {
+    return null;
+  }
+}
 
 async function main() {
   let input = '';
@@ -44,7 +62,20 @@ async function main() {
     webpackOverride: (config) => config,
   });
 
-  const totalFrames = scenes.reduce((sum, s) => sum + Math.max(fps * 3, Math.round(s.estimatedSeconds * fps)), 0);
+  const estimatedFrames = scenes.reduce((sum, s) => sum + Math.max(fps * 3, Math.round(s.estimatedSeconds * fps)), 0);
+
+  // Use actual audio duration so the video never cuts off mid-narration
+  let audioDurationSecs = null;
+  if (publicAudioName) {
+    audioDurationSecs = await getAudioDurationSecs(path.join(publicDir, publicAudioName));
+    if (audioDurationSecs) {
+      console.log(`Audio duration: ${audioDurationSecs.toFixed(1)}s`);
+    } else {
+      console.warn('Could not detect audio duration, using estimate');
+    }
+  }
+  const audioFrames = audioDurationSecs ? Math.ceil(audioDurationSecs * fps) + fps * 2 : 0;
+  const totalFrames = Math.max(estimatedFrames, audioFrames);
 
   const audioRef = publicAudioName || null;
 
@@ -61,8 +92,8 @@ async function main() {
       ...composition,
       durationInFrames: totalFrames,
       fps,
-      width:  1920,
-      height: 1080,
+      width:  1080,
+      height: 1920,
     },
     serveUrl: bundleLocation,
     codec: 'h264',
