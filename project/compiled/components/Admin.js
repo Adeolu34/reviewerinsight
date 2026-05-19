@@ -3968,6 +3968,151 @@ const VIDEO_STATUS_COLORS = {
   scripting: T.warn,
   queued: T.dim
 };
+const YouTubeConnectionCard = () => {
+  const [status, setStatus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState('');
+  const loadStatus = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      setStatus(await AdminClient.getYoutubeStatus());
+    } catch (e) {
+      setStatus(null);
+    }
+    setLoading(false);
+  }, []);
+  React.useEffect(() => {
+    loadStatus();
+    const handler = e => {
+      if (e.data === 'youtube-connected') {
+        setMsg('');
+        loadStatus();
+      } else if (typeof e.data === 'string' && e.data.startsWith('youtube-error:')) {
+        setMsg('✗ ' + e.data.slice('youtube-error:'.length));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+  const handleConnect = async () => {
+    setMsg('');
+    try {
+      const {
+        authUrl
+      } = await AdminClient.getYoutubeAuthUrl();
+      window.open(authUrl, 'youtube-auth', 'width=560,height=680,resizable=yes');
+    } catch (e) {
+      setMsg('✗ ' + e.message);
+    }
+  };
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect YouTube? Future videos will not be uploaded automatically.')) return;
+    try {
+      await AdminClient.disconnectYoutube();
+      setMsg('Disconnected.');
+      loadStatus();
+    } catch (e) {
+      setMsg('✗ ' + e.message);
+    }
+  };
+  return /*#__PURE__*/React.createElement(Card, {
+    title: "YouTube Connection"
+  }, loading ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 12,
+      color: T.muted
+    }
+  }, "Checking\u2026") : !status?.clientConfigured ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontFamily: T.sans,
+      color: T.warn,
+      lineHeight: 1.6
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "Setup required:"), " Add ", /*#__PURE__*/React.createElement("code", {
+    style: {
+      background: T.hover,
+      padding: '2px 6px',
+      borderRadius: 4
+    }
+  }, "YOUTUBE_CLIENT_ID"), " and ", /*#__PURE__*/React.createElement("code", {
+    style: {
+      background: T.hover,
+      padding: '2px 6px',
+      borderRadius: 4
+    }
+  }, "YOUTUBE_CLIENT_SECRET"), " to your environment variables, then reload.") : status?.connected ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      fontFamily: T.mono,
+      fontSize: 13,
+      color: T.ok
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16
+    }
+  }, "\u2713"), " Connected", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: T.dim
+    }
+  }, "(", status.source, ")")), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "danger",
+    onClick: handleDisconnect
+  }, "Disconnect")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontFamily: T.sans,
+      color: T.muted,
+      lineHeight: 1.6
+    }
+  }, "Connect your YouTube channel so generated videos are uploaded automatically.", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Before clicking:"), " In Google Cloud Console, create a ", /*#__PURE__*/React.createElement("em", null, "Web application"), " OAuth credential and add this as an authorized redirect URI:", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("code", {
+    style: {
+      display: 'inline-block',
+      marginTop: 6,
+      background: T.hover,
+      border: `1px solid ${T.border}`,
+      padding: '4px 10px',
+      borderRadius: 4,
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: T.accent,
+      userSelect: 'all'
+    }
+  }, status?.redirectUri || '(loading…)')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Btn, {
+    variant: "primary",
+    onClick: handleConnect
+  }, "Connect to YouTube"))), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: msg.startsWith('✗') ? T.err : T.ok
+    }
+  }, msg));
+};
 const VideosSection = () => {
   const [statusFilter, setStatusFilter] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -4038,7 +4183,7 @@ const VideosSection = () => {
       flexDirection: 'column',
       gap: 20
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(YouTubeConnectionCard, null), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(5, 1fr)',

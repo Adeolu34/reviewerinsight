@@ -385,6 +385,18 @@ const AdminClient = {
       method: 'POST'
     });
   },
+  // YouTube OAuth
+  getYoutubeStatus() {
+    return this._fetch('/youtube/status');
+  },
+  getYoutubeAuthUrl() {
+    return this._fetch('/youtube/auth-url');
+  },
+  disconnectYoutube() {
+    return this._fetch('/youtube/disconnect', {
+      method: 'DELETE'
+    });
+  },
   // Videos
   getVideoStats() {
     return this._fetch('/video-stats');
