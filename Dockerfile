@@ -40,13 +40,13 @@ COPY project/ /app/project/
 # Video output directory
 RUN mkdir -p /var/data/reviewinsight/videos
 
-EXPOSE 3001
+EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV VIDEO_OUTPUT_DIR=/var/data/reviewinsight/videos
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD wget -qO- http://localhost:3001/api/health || exit 1
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
 
 CMD ["node", "src/index.js"]
