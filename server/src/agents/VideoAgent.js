@@ -94,6 +94,24 @@ class VideoAgent {
   }
 
   /**
+   * Reset jobs that have been stuck in an in-progress state for too long.
+   * Prevents a hung TTS/render from blocking a book forever.
+   */
+  async _resetStaleJobs(staleMinutes = 15) {
+    const cutoff = new Date(Date.now() - staleMinutes * 60 * 1000);
+    const result = await VideoJob.updateMany(
+      {
+        status: { $in: ['queued', 'scripting', 'tts', 'rendering'] },
+        updatedAt: { $lt: cutoff },
+      },
+      { $set: { status: 'failed', error: `Stale: stuck in-progress for over ${staleMinutes} minutes`, errorStep: 'stale-reset' } }
+    );
+    if (result.modifiedCount > 0) {
+      logger.warn(`[VideoAgent] Reset ${result.modifiedCount} stale job(s) older than ${staleMinutes}min`);
+    }
+  }
+
+  /**
    * Find the next N books with completed reviews but no video, and generate them.
    */
   async runBatch(batchSize = 5) {
@@ -104,6 +122,8 @@ class VideoAgent {
     this._running = true;
 
     try {
+      await this._resetStaleJobs();
+
       const existingJobBookIds = await VideoJob.distinct('bookId', {
         status: { $in: ['queued','scripting','tts','rendering','done'] },
       });

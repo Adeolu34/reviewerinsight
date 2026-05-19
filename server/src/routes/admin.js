@@ -937,6 +937,22 @@ router.post('/videos/batch', requireAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/admin/videos/:id/retry — reset a failed/stuck job and re-run it
+router.post('/videos/:id/retry', requireAdmin, async (req, res, next) => {
+  try {
+    const job = await VideoJob.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const VideoAgent = require('../agents/VideoAgent');
+    const agent = new VideoAgent();
+    agent.generateForBook(job.bookId).catch(err => {
+      logger.error(`[admin] Video retry failed for job ${job._id}: ${err.message}`);
+    });
+
+    res.json({ ok: true, message: 'Retry started' });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/admin/videos/:id — delete a video job (and its files)
 router.delete('/videos/:id', requireAdmin, async (req, res, next) => {
   try {

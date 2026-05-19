@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const http = require('http');
 const logger = require('../utils/logger');
+const { withRetry } = require('../utils/retry');
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1';
@@ -51,12 +51,20 @@ async function generateSpeech(text, options = {}) {
       if (res.statusCode !== 200) {
         let errBody = '';
         res.on('data', d => { errBody += d; });
-        res.on('end', () => reject(new Error(`ElevenLabs ${res.statusCode}: ${errBody}`)));
+        res.on('end', () => {
+          const err = new Error(`ElevenLabs ${res.statusCode}: ${errBody}`);
+          err.status = res.statusCode;
+          reject(err);
+        });
         return;
       }
       const chunks = [];
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+
+    req.setTimeout(90000, () => {
+      req.destroy(new Error('ElevenLabs TTS request timed out after 90s'));
     });
 
     req.on('error', reject);
@@ -71,7 +79,10 @@ async function generateSpeech(text, options = {}) {
  */
 async function generateSpeechFile(text, outputPath, options = {}) {
   logger.info(`ElevenLabs TTS: generating ${text.length} chars → ${outputPath}`);
-  const audioBuffer = await generateSpeech(text, options);
+  const audioBuffer = await withRetry(
+    () => generateSpeech(text, options),
+    { maxAttempts: 3, baseDelayMs: 2000, label: 'ElevenLabs TTS' }
+  );
   await fs.promises.writeFile(outputPath, audioBuffer);
   logger.info(`ElevenLabs TTS: saved ${audioBuffer.length} bytes`);
   return outputPath;
