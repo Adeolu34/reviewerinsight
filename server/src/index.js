@@ -71,9 +71,43 @@ async function startServer() {
   app.use('/api/recommendations', recommendationsRouter);
   app.use('/api/authors', authorsRouter);
 
-  // Video file download (served from disk)
-  const requireAdmin = require('./middleware/requireAdmin');
+  // Video streaming — public, supports Range requests for seeking
   const fs = require('fs');
+  app.get('/videos/:id/stream', async (req, res, next) => {
+    try {
+      const job = await VideoJob.findById(req.params.id).lean();
+      if (!job || !job.videoPath) return res.status(404).json({ error: 'Video not found' });
+      if (!fs.existsSync(job.videoPath)) return res.status(404).json({ error: 'File not on disk' });
+
+      const stat = fs.statSync(job.videoPath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      if (range) {
+        const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(startStr, 10);
+        const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': 'video/mp4',
+        });
+        fs.createReadStream(job.videoPath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Content-Type': 'video/mp4',
+          'Accept-Ranges': 'bytes',
+        });
+        fs.createReadStream(job.videoPath).pipe(res);
+      }
+    } catch (err) { next(err); }
+  });
+
+  // Video file download (admin only)
+  const requireAdmin = require('./middleware/requireAdmin');
   app.get('/videos/:id/download', requireAdmin, async (req, res, next) => {
     try {
       const job = await VideoJob.findById(req.params.id).lean();

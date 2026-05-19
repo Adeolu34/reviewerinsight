@@ -75,9 +75,11 @@ class VideoAgent {
         outputPath: videoPath,
       });
 
+      const videoUrl = `/videos/${job._id}/stream`;
       await job.updateOne({
         status:      'done',
         videoPath,
+        videoUrl,
         completedAt: new Date(),
         durationMs:  Date.now() - job.startedAt.getTime(),
       });

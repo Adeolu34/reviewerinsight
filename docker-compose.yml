@@ -8,6 +8,8 @@ services:
     depends_on:
       - mongo
     restart: unless-stopped
+    volumes:
+      - video-data:/var/data/reviewinsight/videos
 
   mongo:
     image: mongo:7
@@ -19,3 +21,4 @@ services:
 
 volumes:
   mongo-data:
+  video-data:

@@ -71,4 +71,23 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// GET /api/books/:id/video — video job status + stream URL for this book
+router.get('/:id/video', async (req, res, next) => {
+  try {
+    const VideoJob = require('../models/VideoJob');
+    const job = await VideoJob.findOne({ bookId: req.params.id })
+      .select('status videoUrl videoPath completedAt durationMs error')
+      .lean();
+    if (!job) return res.status(404).json({ error: 'No video for this book' });
+    res.json({
+      status:      job.status,
+      videoUrl:    job.videoUrl || null,
+      available:   job.status === 'done' && !!job.videoPath,
+      completedAt: job.completedAt,
+      durationMs:  job.durationMs,
+      error:       job.error || null,
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
