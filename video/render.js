@@ -26,20 +26,32 @@ async function main() {
     process.exit(1);
   }
 
+  // Copy audio into video/public/ so Remotion's staticFile() can serve it
+  const publicDir = path.join(__dirname, 'public');
+  await fs.promises.mkdir(publicDir, { recursive: true });
+  let publicAudioName = null;
+  if (audioFile && fs.existsSync(audioFile)) {
+    publicAudioName = `audio-${Date.now()}${path.extname(audioFile)}`;
+    await fs.promises.copyFile(audioFile, path.join(publicDir, publicAudioName));
+  }
+
   const entryPoint = path.join(__dirname, 'src', 'index.jsx');
   console.log('Bundling Remotion composition…');
 
   const bundleLocation = await bundle({
     entryPoint,
+    publicDir,
     webpackOverride: (config) => config,
   });
 
   const totalFrames = scenes.reduce((sum, s) => sum + Math.max(fps * 3, Math.round(s.estimatedSeconds * fps)), 0);
 
+  const audioRef = publicAudioName || null;
+
   const composition = await selectComposition({
     serveUrl: bundleLocation,
     id: 'BookSummary',
-    inputProps: { book, scenes, audioFile },
+    inputProps: { book, scenes, audioFile: audioRef },
   });
 
   console.log(`Rendering ${totalFrames} frames @ ${fps}fps → ${outputPath}`);
@@ -55,12 +67,17 @@ async function main() {
     serveUrl: bundleLocation,
     codec: 'h264',
     outputLocation: outputPath,
-    inputProps: { book, scenes, audioFile },
+    inputProps: { book, scenes, audioFile: audioRef },
     timeoutInMilliseconds: 300000,
     onProgress: ({ progress }) => {
       process.stdout.write(`\rRendering: ${Math.round(progress * 100)}%   `);
     },
   });
+
+  // Clean up temp audio from public dir
+  if (publicAudioName) {
+    await fs.promises.unlink(path.join(publicDir, publicAudioName)).catch(() => {});
+  }
 
   console.log(`\nDone → ${outputPath}`);
   // Output path for parent process to read

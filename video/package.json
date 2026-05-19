@@ -8,6 +8,8 @@
     "render": "node render.js"
   },
   "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "remotion": "^4.0.463",
     "@remotion/bundler": "^4.0.463",
     "@remotion/cli": "^4.0.463",
