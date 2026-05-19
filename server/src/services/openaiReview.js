@@ -42,7 +42,7 @@ async function generateReview(book, persona) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        { temperature: 0.8, max_tokens: 1800 },
+        { temperature: 0.8, max_tokens: 2500 },
       ),
     );
   }, { label: `LLM review: "${book.title}"`, maxAttempts: 2 });

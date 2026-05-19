@@ -33,6 +33,16 @@ async function startServer() {
     await adminRouter.seedInitialAdmin();
   }
 
+  // Reset any video jobs that were left in-progress from a previous process
+  const VideoJob = require('./models/VideoJob');
+  const stuck = await VideoJob.updateMany(
+    { status: { $in: ['queued', 'scripting', 'tts', 'rendering'] } },
+    { $set: { status: 'failed', error: 'Server restarted mid-job', errorStep: 'startup' } },
+  );
+  if (stuck.modifiedCount > 0) {
+    logger.warn(`[startup] Reset ${stuck.modifiedCount} stuck video job(s) to failed`);
+  }
+
   const app = express();
 
   // Middleware
