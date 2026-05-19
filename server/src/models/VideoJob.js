@@ -4,7 +4,7 @@ const videoJobSchema = new mongoose.Schema({
   bookId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Book', required: true },
   status:  {
     type: String,
-    enum: ['queued', 'scripting', 'tts', 'rendering', 'done', 'failed'],
+    enum: ['queued', 'scripting', 'tts', 'rendering', 'uploading', 'done', 'failed'],
     default: 'queued',
     index: true,
   },
@@ -26,8 +26,9 @@ const videoJobSchema = new mongoose.Schema({
   audioPath:  { type: String },
   videoPath:  { type: String },
 
-  // Public URL after video is served/uploaded
-  videoUrl:   { type: String },
+  // YouTube upload result
+  youtubeVideoId: { type: String },
+  videoUrl:       { type: String },  // https://youtu.be/<id> once uploaded
 
   // Error info
   error:      { type: String },

@@ -6,6 +6,7 @@ const Book     = require('../models/Book');
 const VideoJob = require('../models/VideoJob');
 const { generateVideoScript }  = require('../services/videoScript');
 const { generateSpeechFile }   = require('../services/elevenLabs');
+const { uploadVideo, isConfigured: youtubeConfigured } = require('../services/youtube');
 const logger   = require('../utils/logger');
 
 const VIDEO_OUTPUT_DIR = process.env.VIDEO_OUTPUT_DIR
@@ -75,16 +76,50 @@ class VideoAgent {
         outputPath: videoPath,
       });
 
-      const videoUrl = `/videos/${job._id}/stream`;
+      // ── Step 4: Upload to YouTube (if credentials present) ──────
+      let videoUrl  = `/videos/${job._id}/stream`;
+      let youtubeVideoId = null;
+
+      if (youtubeConfigured()) {
+        await job.updateOne({ status: 'uploading' });
+        try {
+          const tags = [
+            book.genre, 'book review', 'book summary', book.title, book.author,
+            'reviewerinsight', '#BookTok', '#BookReview',
+          ].filter(Boolean);
+
+          const result = await uploadVideo({
+            filePath:       videoPath,
+            title:          script.title || `${book.title} — Book Review`,
+            description:    script.description || `Full review at reviewerinsight.com`,
+            tags,
+            privacyStatus:  process.env.YOUTUBE_PRIVACY || 'public',
+          });
+
+          youtubeVideoId = result.videoId;
+          videoUrl       = result.videoUrl;
+
+          // Local files no longer needed — clean up to save disk space
+          await fs.promises.unlink(videoPath).catch(() => {});
+          await fs.promises.unlink(audioPath).catch(() => {});
+          logger.info(`[VideoAgent] YouTube upload done → ${videoUrl}`);
+        } catch (err) {
+          // Upload failed — keep local file, fall back to local stream URL
+          logger.error(`[VideoAgent] YouTube upload failed (keeping local file): ${err.message}`);
+        }
+      }
+
       await job.updateOne({
         status:      'done',
-        videoPath,
+        videoPath:   youtubeVideoId ? null : videoPath,
+        audioPath:   youtubeVideoId ? null : audioPath,
         videoUrl,
+        youtubeVideoId,
         completedAt: new Date(),
         durationMs:  Date.now() - job.startedAt.getTime(),
       });
 
-      logger.info(`[VideoAgent] Done → ${videoPath}`);
+      logger.info(`[VideoAgent] Done → ${videoUrl}`);
       return await VideoJob.findById(job._id);
 
     } catch (err) {
@@ -103,7 +138,7 @@ class VideoAgent {
     const cutoff = new Date(Date.now() - staleMinutes * 60 * 1000);
     const result = await VideoJob.updateMany(
       {
-        status: { $in: ['queued', 'scripting', 'tts', 'rendering'] },
+        status: { $in: ['queued', 'scripting', 'tts', 'rendering', 'uploading'] },
         updatedAt: { $lt: cutoff },
       },
       { $set: { status: 'failed', error: `Stale: stuck in-progress for over ${staleMinutes} minutes`, errorStep: 'stale-reset' } }
