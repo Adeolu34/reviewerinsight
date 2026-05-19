@@ -1887,9 +1887,15 @@ const YouTubeConnectionCard = () => {
         </div>
       ) : status?.connected ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: T.mono, fontSize: 13, color: T.ok }}>
-            <span style={{ fontSize: 16 }}>✓</span> Connected
-            <span style={{ fontSize: 11, color: T.dim }}>({status.source})</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: T.mono, fontSize: 13, color: T.ok }}>
+            <span style={{ fontSize: 16 }}>✓</span>
+            <span>Connected{status.channelName ? ` — ${status.channelName}` : ''}</span>
+            {status.channelId && (
+              <a href={`https://youtube.com/channel/${status.channelId}`} target="_blank" rel="noreferrer"
+                style={{ fontSize: 10, color: T.dim, textDecoration: 'none', borderBottom: `1px dotted ${T.dim}` }}>
+                view channel ↗
+              </a>
+            )}
           </span>
           <Btn small variant="danger" onClick={handleDisconnect}>Disconnect</Btn>
         </div>

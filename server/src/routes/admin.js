@@ -921,16 +921,35 @@ router.post('/authors/:id/regenerate-bio', async (req, res, next) => {
 router.get('/youtube/status', async (req, res, next) => {
   try {
     const AppSetting = require('../models/AppSetting');
-    const [dbSetting] = await Promise.all([AppSetting.findOne({ key: 'youtube_refresh_token' })]);
+    const dbSetting = await AppSetting.findOne({ key: 'youtube_refresh_token' });
     const fromEnv = !!process.env.YOUTUBE_REFRESH_TOKEN;
     const fromDb  = !!dbSetting?.value;
+    const connected = fromEnv || fromDb;
     const redirectUri = process.env.YOUTUBE_REDIRECT_URI
       || `${req.protocol}://${req.get('host')}/api/admin/youtube/callback`;
+
+    let channelName = null;
+    let channelId   = null;
+    if (connected) {
+      try {
+        const { getClient } = require('../services/youtube');
+        const { google } = require('googleapis');
+        const auth = await getClient();
+        const yt   = google.youtube({ version: 'v3', auth });
+        const ch   = await yt.channels.list({ part: ['snippet'], mine: true });
+        const item = ch.data.items?.[0];
+        channelName = item?.snippet?.title || null;
+        channelId   = item?.id || null;
+      } catch (_) {}
+    }
+
     res.json({
-      connected:       fromEnv || fromDb,
+      connected,
       source:          fromEnv ? 'env' : fromDb ? 'database' : null,
       clientConfigured: !!(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET),
       redirectUri,
+      channelName,
+      channelId,
     });
   } catch (err) { next(err); }
 });

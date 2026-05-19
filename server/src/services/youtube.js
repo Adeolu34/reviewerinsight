@@ -73,4 +73,4 @@ async function uploadVideo({ filePath, title, description, tags = [], privacySta
   return { videoId, videoUrl };
 }
 
-module.exports = { uploadVideo, isConfigured };
+module.exports = { uploadVideo, isConfigured, getClient };

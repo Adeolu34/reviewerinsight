@@ -4053,7 +4053,7 @@ const YouTubeConnectionCard = () => {
     style: {
       display: 'inline-flex',
       alignItems: 'center',
-      gap: 6,
+      gap: 8,
       fontFamily: T.mono,
       fontSize: 13,
       color: T.ok
@@ -4062,12 +4062,17 @@ const YouTubeConnectionCard = () => {
     style: {
       fontSize: 16
     }
-  }, "\u2713"), " Connected", /*#__PURE__*/React.createElement("span", {
+  }, "\u2713"), /*#__PURE__*/React.createElement("span", null, "Connected", status.channelName ? ` — ${status.channelName}` : ''), status.channelId && /*#__PURE__*/React.createElement("a", {
+    href: `https://youtube.com/channel/${status.channelId}`,
+    target: "_blank",
+    rel: "noreferrer",
     style: {
-      fontSize: 11,
-      color: T.dim
+      fontSize: 10,
+      color: T.dim,
+      textDecoration: 'none',
+      borderBottom: `1px dotted ${T.dim}`
     }
-  }, "(", status.source, ")")), /*#__PURE__*/React.createElement(Btn, {
+  }, "view channel \u2197")), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "danger",
     onClick: handleDisconnect
