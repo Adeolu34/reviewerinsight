@@ -1,6 +1,7 @@
 // Typographic book-cover tile with 3D perspective hover effects
 const Cover = ({ book, size = "md", rotate = 0, float: shouldFloat = false }) => {
-  const { cover, coverImageUrl, title, author } = book;
+  const { cover: rawCover, coverImageUrl, title, author } = book;
+  const cover = rawCover || { bg: '#141210', fg: '#F5EFE4', motif: 'bars' };
   const [imgFailed, setImgFailed] = React.useState(false);
   const useImage = coverImageUrl && !imgFailed;
   const ref = React.useRef(null);
