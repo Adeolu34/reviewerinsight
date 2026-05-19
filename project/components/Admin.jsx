@@ -1018,6 +1018,21 @@ const SystemSection = () => {
           rows={data.schedule}
         />
       </Card>
+
+      {/* Video Schedule */}
+      <Card title="Video Schedule">
+        <div style={{ fontSize: 12, fontFamily: T.sans, color: T.dim, marginBottom: 12 }}>
+          Automatically generates 1 video per run — 2 per day total — and uploads to YouTube.
+        </div>
+        <Table
+          columns={[
+            { key: 'label', label: 'Run' },
+            { key: 'hour', label: 'Time (UTC)', render: (v, row) => `${String(v).padStart(2,'0')}:${String(row.minute).padStart(2,'0')} UTC`, mono: true },
+            { key: 'nextRun', label: 'Next Run', render: v => fmtTime(v), mono: true },
+          ]}
+          rows={data.videoSchedule || []}
+        />
+      </Card>
     </div>
   );
 };

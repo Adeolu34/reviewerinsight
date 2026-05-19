@@ -185,6 +185,25 @@ async function startServer() {
   }, { timezone: 'UTC' });
   logger.info('AutoImport schedule: every 30 minutes');
 
+  // Video generation: 1 video at 9 AM UTC and 1 at 9 PM UTC = 2/day
+  const VideoAgent = require('./agents/VideoAgent');
+  const videoAgent = new VideoAgent();
+  app.set('videoAgent', videoAgent);
+
+  const runScheduledVideo = async () => {
+    logger.info('[VideoAgent] Scheduled run starting');
+    try {
+      const results = await videoAgent.runBatch(1);
+      logger.info(`[VideoAgent] Scheduled run done: ${JSON.stringify(results)}`);
+    } catch (err) {
+      logger.error(`[VideoAgent] Scheduled run failed: ${err.message}`);
+    }
+  };
+
+  cron.schedule('0 9 * * *',  runScheduledVideo, { timezone: 'UTC' });
+  cron.schedule('0 21 * * *', runScheduledVideo, { timezone: 'UTC' });
+  logger.info('VideoAgent schedule: daily at 9:00 AM and 9:00 PM UTC');
+
   app.listen(config.port, () => {
     logger.info(`Reviewer Insight server running on http://localhost:${config.port}`);
     logger.info(`Frontend: http://localhost:${config.port}`);

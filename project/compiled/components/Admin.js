@@ -2293,6 +2293,31 @@ const SystemSection = () => {
       mono: true
     }],
     rows: data.schedule
+  })), /*#__PURE__*/React.createElement(Card, {
+    title: "Video Schedule"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontFamily: T.sans,
+      color: T.dim,
+      marginBottom: 12
+    }
+  }, "Automatically generates 1 video per run \u2014 2 per day total \u2014 and uploads to YouTube."), /*#__PURE__*/React.createElement(Table, {
+    columns: [{
+      key: 'label',
+      label: 'Run'
+    }, {
+      key: 'hour',
+      label: 'Time (UTC)',
+      render: (v, row) => `${String(v).padStart(2, '0')}:${String(row.minute).padStart(2, '0')} UTC`,
+      mono: true
+    }, {
+      key: 'nextRun',
+      label: 'Next Run',
+      render: v => fmtTime(v),
+      mono: true
+    }],
+    rows: data.videoSchedule || []
   })));
 };
 

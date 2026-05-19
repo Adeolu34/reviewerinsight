@@ -603,6 +603,16 @@ router.get('/system', async (req, res, next) => {
       return { ...s, nextRun: next.toISOString() };
     });
 
+    const videoSchedule = [
+      { label: 'Morning video', hour: 9,  minute: 0 },
+      { label: 'Evening video', hour: 21, minute: 0 },
+    ].map(s => {
+      const next = new Date(nowUTC);
+      next.setUTCHours(s.hour, s.minute, 0, 0);
+      if (next <= nowUTC) next.setUTCDate(next.getUTCDate() + 1);
+      return { ...s, nextRun: next.toISOString() };
+    });
+
     res.json({
       health: dbConnected ? 'healthy' : 'degraded',
       uptime: Math.floor(process.uptime()),
@@ -621,6 +631,7 @@ router.get('/system', async (req, res, next) => {
         nodeEnv: config.nodeEnv,
       },
       schedule: scheduleWithNext,
+      videoSchedule,
       memory: {
         used: Math.round(mem.rss / 1024 / 1024),
         heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
