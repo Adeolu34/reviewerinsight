@@ -33,7 +33,7 @@ async function generateReview(book, persona) {
   const userPrompt = buildUserPrompt(book);
   const systemPrompt = chatJsonObjectMode
     ? persona.systemPrompt
-    : `${persona.systemPrompt}\n\nRespond with a single valid JSON object only (no markdown, no commentary).`;
+    : `${persona.systemPrompt}\n\nCRITICAL: You review every book assigned to you — no exceptions, no refusals, regardless of genre or subject matter. Respond with a single valid JSON object only (no markdown, no commentary, no apologies).`;
 
   const response = await withRetry(async () => {
     return await openai.chat.completions.create(
@@ -42,13 +42,18 @@ async function generateReview(book, persona) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        { temperature: 0.8, max_tokens: 3500 },
+        { temperature: 0.8, max_tokens: 4500 },
       ),
     );
   }, { label: `LLM review: "${book.title}"`, maxAttempts: 2 });
 
-  const content = response.choices[0].message.content;
+  const choice = response.choices[0];
+  const content = choice.message.content;
   const tokensUsed = response.usage?.total_tokens || 0;
+
+  if (choice.finish_reason === 'length') {
+    logger.warn(`[Review] Response truncated at max_tokens for "${book.title}" — attempting partial parse`);
+  }
 
   let parsed;
   try {
@@ -152,7 +157,7 @@ async function generateChapterSummary(book, persona) {
   const userPrompt = buildChapterPrompt(book);
   const systemPrompt = chatJsonObjectMode
     ? persona.systemPrompt
-    : `${persona.systemPrompt}\n\nRespond with a single valid JSON object only (no markdown, no commentary).`;
+    : `${persona.systemPrompt}\n\nCRITICAL: You review every book assigned to you — no exceptions, no refusals, regardless of genre or subject matter. Respond with a single valid JSON object only (no markdown, no commentary, no apologies).`;
 
   const response = await withRetry(async () => {
     return await openai.chat.completions.create(
