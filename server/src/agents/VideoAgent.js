@@ -31,7 +31,11 @@ class VideoAgent {
     if (book.status !== 'published') throw new Error(`Book "${book.title}" is not published (status: ${book.status})`);
     if (!book.review?.headline) throw new Error(`Book "${book.title}" has no review yet`);
 
-    // Upsert job
+    // Block if a completed video already exists for this book
+    const done = await VideoJob.findOne({ bookId: book._id, status: 'done' }).lean();
+    if (done) throw new Error(`Book "${book.title}" already has a completed video`);
+
+    // Upsert job — only reaches here if no done job exists
     let job = await VideoJob.findOneAndUpdate(
       { bookId: book._id },
       { $set: { status: 'queued', error: null, errorStep: null, startedAt: new Date() } },
