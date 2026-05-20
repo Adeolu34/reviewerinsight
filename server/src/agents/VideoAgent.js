@@ -28,6 +28,7 @@ class VideoAgent {
   async generateForBook(bookId) {
     const book = await Book.findById(bookId).lean();
     if (!book) throw new Error(`Book not found: ${bookId}`);
+    if (book.status !== 'published') throw new Error(`Book "${book.title}" is not published (status: ${book.status})`);
     if (!book.review?.headline) throw new Error(`Book "${book.title}" has no review yet`);
 
     // Upsert job

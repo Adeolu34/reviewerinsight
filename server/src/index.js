@@ -200,9 +200,11 @@ async function startServer() {
     }
   };
 
+  cron.schedule('0 3 * * *',  runScheduledVideo, { timezone: 'UTC' });
   cron.schedule('0 9 * * *',  runScheduledVideo, { timezone: 'UTC' });
+  cron.schedule('0 15 * * *', runScheduledVideo, { timezone: 'UTC' });
   cron.schedule('0 21 * * *', runScheduledVideo, { timezone: 'UTC' });
-  logger.info('VideoAgent schedule: daily at 9:00 AM and 9:00 PM UTC');
+  logger.info('VideoAgent schedule: daily at 3:00 AM, 9:00 AM, 3:00 PM and 9:00 PM UTC');
 
   app.listen(config.port, () => {
     logger.info(`Reviewer Insight server running on http://localhost:${config.port}`);
