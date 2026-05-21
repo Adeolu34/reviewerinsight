@@ -73,12 +73,13 @@ class VideoAgent {
 
       await this._renderVideo({
         book: {
-          title:  book.title,
-          author: book.author,
-          year:   book.year,
-          genre:  book.genre,
-          rating: book.rating,
-          cover:  coverData,
+          title:         book.title,
+          author:        book.author,
+          year:          book.year,
+          genre:         book.genre,
+          rating:        book.rating,
+          cover:         coverData,
+          coverImageUrl: book.coverImageUrl || null,
         },
         scenes:    script.scenes,
         audioFile: audioPath,

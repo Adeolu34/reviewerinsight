@@ -1,6 +1,6 @@
 const {
   AbsoluteFill, Audio, Sequence, useCurrentFrame, useVideoConfig,
-  interpolate, spring, staticFile, Easing, random, interpolateColors,
+  interpolate, spring, staticFile, Easing, random, interpolateColors, Img,
 } = require('remotion');
 const React = require('react');
 
@@ -257,8 +257,19 @@ const IntroScene = ({ book, durationInFrames }) => {
 
       {/* Ken Burns cover inside spring envelope */}
       <div style={{ transform:`scale(${coverSpr})`, transformOrigin:'center bottom' }}>
-        <div style={{ transform:`scale(${kbScale}) translateX(${kbX}px)`, transformOrigin:'center', overflow:'hidden', borderRadius:8 }}>
-          <CoverTile cover={book.cover} title={book.title} author={book.author} size={300} />
+        <div style={{ transform:`scale(${kbScale}) translateX(${kbX}px)`, transformOrigin:'center', overflow:'hidden', borderRadius:10 }}>
+          {book.coverImageUrl ? (
+            <div style={{ position:'relative', width:300, height:420, borderRadius:10, overflow:'hidden', boxShadow:'0 40px 100px -20px rgba(0,0,0,0.9)' }}>
+              <Img
+                src={book.coverImageUrl}
+                style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+              />
+              {/* Subtle RI badge over real cover */}
+              <div style={{ position:'absolute', top:12, left:12, fontFamily:MONO, fontSize:12, fontWeight:700, letterSpacing:'.12em', textTransform:'uppercase', background:'rgba(232,67,44,0.92)', color:'#fff', padding:'4px 8px', borderRadius:3 }}>RI</div>
+            </div>
+          ) : (
+            <CoverTile cover={book.cover} title={book.title} author={book.author} size={300} />
+          )}
         </div>
       </div>
 
@@ -461,8 +472,14 @@ const OutroScene = ({ scene, book }) => {
       <Particles count={22} fg={fg} />
 
       {/* Faded cover with glow */}
-      <div style={{ opacity:sceneOp * 0.55, transform:`scale(${coverSpr})`, filter:`drop-shadow(0 20px 40px rgba(232,67,44,0.35))` }}>
-        <CoverTile cover={book.cover} title={book.title} author={book.author} size={160} />
+      <div style={{ opacity:sceneOp * 0.6, transform:`scale(${coverSpr})`, filter:`drop-shadow(0 20px 40px rgba(232,67,44,0.4))` }}>
+        {book.coverImageUrl ? (
+          <div style={{ width:160, height:224, borderRadius:6, overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.8)' }}>
+            <Img src={book.coverImageUrl} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+          </div>
+        ) : (
+          <CoverTile cover={book.cover} title={book.title} author={book.author} size={160} />
+        )}
       </div>
 
       {/* CTA word reveal */}
