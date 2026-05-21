@@ -9,6 +9,26 @@ const SERIF  = '"DM Serif Display", Georgia, serif';
 const MONO   = '"JetBrains Mono", monospace';
 const TRANSITION_FRAMES = 12; // cross-fade overlap between scenes
 
+// ─── Contrast helpers ─────────────────────────────────────────
+function _lum(hex) {
+  const h = (hex || '#141210').replace('#', '');
+  const r = parseInt(h.slice(0,2),16)/255;
+  const g = parseInt(h.slice(2,4),16)/255;
+  const b = parseInt(h.slice(4,6),16)/255;
+  const f = c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b);
+}
+// White on dark backgrounds, near-black on light — always WCAG AA+
+function textColor(bg) {
+  return _lum(bg) > 0.35 ? '#111111' : '#FFFFFF';
+}
+// Strong shadow so text pops regardless of what's behind it
+function textShadow(bg) {
+  return _lum(bg) > 0.35
+    ? '0 2px 8px rgba(0,0,0,0.85), 0 1px 3px rgba(0,0,0,0.95)'
+    : '0 2px 12px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.9)';
+}
+
 function fadeIn(frame, start, dur, easing = Easing.ease) {
   return interpolate(frame, [start, start + dur], [0, 1], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing,
@@ -16,7 +36,7 @@ function fadeIn(frame, start, dur, easing = Easing.ease) {
 }
 
 // ─── Word-by-word text reveal ─────────────────────────────────
-const WordReveal = ({ text, startFrame, wps = 3, fontSize, color, center = false }) => {
+const WordReveal = ({ text, startFrame, wps = 3, fontSize, color, shadow, center = false }) => {
   const frame      = useCurrentFrame();
   const { fps }    = useVideoConfig();
   const words      = text.split(' ');
@@ -43,6 +63,7 @@ const WordReveal = ({ text, startFrame, wps = 3, fontSize, color, center = false
             fontSize,
             fontWeight: 700,
             color,
+            textShadow: shadow || 'none',
             lineHeight: 1.45,
             marginRight: i < words.length - 1 ? '0.26em' : 0,
           }}>
@@ -242,15 +263,15 @@ const IntroScene = ({ book, durationInFrames }) => {
       </div>
 
       {/* Title block */}
-      <div style={{ opacity:titleOp, textAlign:'center', color:fg, width:'100%' }}>
+      <div style={{ opacity:titleOp, textAlign:'center', color:textColor(bg), width:'100%' }}>
         <div style={{ height:3, background:ACCENT, width:`${barPct}%`, margin:'0 auto 20px', boxShadow:`0 0 14px ${ACCENT}` }} />
-        <div style={{ fontFamily:MONO, fontSize:20, fontWeight:600, letterSpacing:'.16em', textTransform:'uppercase', opacity:.55, marginBottom:14 }}>
+        <div style={{ fontFamily:MONO, fontSize:20, fontWeight:600, letterSpacing:'.16em', textTransform:'uppercase', opacity:.7, marginBottom:14, textShadow:textShadow(bg) }}>
           {book.genre} · {book.year || ''}
         </div>
-        <div style={{ fontFamily:SERIF, fontSize:72, fontWeight:900, lineHeight:1.08, textShadow:'0 2px 24px rgba(0,0,0,0.5)' }}>
+        <div style={{ fontFamily:SERIF, fontSize:72, fontWeight:900, lineHeight:1.08, textShadow:textShadow(bg) }}>
           {book.title}
         </div>
-        <div style={{ fontFamily:MONO, fontSize:24, marginTop:16, opacity:.6, letterSpacing:'.06em' }}>
+        <div style={{ fontFamily:MONO, fontSize:24, marginTop:16, opacity:.75, letterSpacing:'.06em', textShadow:textShadow(bg) }}>
           by {book.author}
         </div>
       </div>
@@ -300,6 +321,7 @@ const ContentScene = ({ scene, book, index }) => {
           textTransform:'uppercase', color:ACCENT, marginBottom:34,
           transform:`translateX(${labelX}px)`,
           display:'flex', alignItems:'center', gap:12,
+          textShadow:'0 1px 6px rgba(0,0,0,0.8)',
         }}>
           <div style={{ width:22, height:2, background:ACCENT }} />
           {label}
@@ -311,7 +333,8 @@ const ContentScene = ({ scene, book, index }) => {
           startFrame={fps * 0.3}
           wps={2.5}
           fontSize={62}
-          color={fg}
+          color={textColor(bg)}
+          shadow={textShadow(bg)}
         />
       </div>
 
@@ -321,8 +344,8 @@ const ContentScene = ({ scene, book, index }) => {
           <div key={i} style={{
             width: i === index ? 30 : 10,
             height: 10, borderRadius: 5,
-            background: i === index ? ACCENT : fg,
-            opacity: i === index ? 1 : 0.2,
+            background: i === index ? ACCENT : textColor(bg),
+            opacity: i === index ? 1 : 0.25,
           }} />
         ))}
       </div>
@@ -366,7 +389,7 @@ const VerdictScene = ({ scene, book }) => {
       <Particles count={16} fg={fg} />
 
       <div style={{ opacity:sceneOp, textAlign:'center', width:'100%' }}>
-        <div style={{ fontFamily:MONO, fontSize:17, fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', color:ACCENT, marginBottom:40, display:'flex', justifyContent:'center', alignItems:'center', gap:14 }}>
+        <div style={{ fontFamily:MONO, fontSize:17, fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', color:ACCENT, marginBottom:40, display:'flex', justifyContent:'center', alignItems:'center', gap:14, textShadow:'0 1px 6px rgba(0,0,0,0.8)' }}>
           <div style={{ width:22, height:2, background:ACCENT }} />
           The Verdict
           <div style={{ width:22, height:2, background:ACCENT }} />
@@ -379,20 +402,20 @@ const VerdictScene = ({ scene, book }) => {
               fontSize:66, lineHeight:1,
               transform:`scale(${starScales[i]})`,
               transformOrigin:'center',
-              color: i < stars ? ACCENT : fg,
-              opacity: i < stars ? 1 : 0.18,
+              color: i < stars ? ACCENT : textColor(bg),
+              opacity: i < stars ? 1 : 0.2,
               filter: i < stars ? `drop-shadow(0 0 ${starGlow}px ${ACCENT}99)` : 'none',
             }}>★</div>
           ))}
         </div>
 
         {/* Score count-up */}
-        <div style={{ fontFamily:MONO, fontSize:22, color:fg, opacity:.5, marginBottom:12 }}>
+        <div style={{ fontFamily:MONO, fontSize:22, color:textColor(bg), opacity:.65, marginBottom:12, textShadow:textShadow(bg) }}>
           {scoreDisplay.toFixed(1)}/5
         </div>
 
         {/* Score fill bar */}
-        <div style={{ width:140, height:4, background:`${fg}1a`, margin:'0 auto 44px', borderRadius:2 }}>
+        <div style={{ width:140, height:4, background:'rgba(255,255,255,0.15)', margin:'0 auto 44px', borderRadius:2 }}>
           <div style={{ height:'100%', width:`${scoreFill}%`, background:ACCENT, borderRadius:2, boxShadow:`0 0 10px ${ACCENT}` }} />
         </div>
 
@@ -402,7 +425,8 @@ const VerdictScene = ({ scene, book }) => {
           startFrame={fps * 1.0}
           wps={2.5}
           fontSize={46}
-          color={fg}
+          color={textColor(bg)}
+          shadow={textShadow(bg)}
           center
         />
       </div>
@@ -448,17 +472,18 @@ const OutroScene = ({ scene, book }) => {
           startFrame={fps * 0.4}
           wps={2.2}
           fontSize={48}
-          color={fg}
+          color={textColor(bg)}
+          shadow={textShadow(bg)}
           center
         />
       </div>
 
       {/* URL slide up + pulse glow */}
       <div style={{ opacity:urlOp, transform:`translateY(${urlSlideY}px)`, textAlign:'center' }}>
-        <div style={{ fontFamily:MONO, fontSize:16, fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', color:fg, opacity:.45, marginBottom:12 }}>
+        <div style={{ fontFamily:MONO, fontSize:16, fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', color:textColor(bg), opacity:.6, marginBottom:12, textShadow:textShadow(bg) }}>
           Full review at
         </div>
-        <div style={{ fontFamily:MONO, fontSize:38, fontWeight:700, color:ACCENT, letterSpacing:'.04em', textShadow:`0 0 ${urlGlow}px ${ACCENT}` }}>
+        <div style={{ fontFamily:MONO, fontSize:38, fontWeight:700, color:ACCENT, letterSpacing:'.04em', textShadow:`0 2px 8px rgba(0,0,0,0.8), 0 0 ${urlGlow}px ${ACCENT}` }}>
           reviewerinsight.com
         </div>
       </div>
