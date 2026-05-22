@@ -2106,6 +2106,14 @@ const NATURE_STATUS_COLORS = {
 };
 
 /** Always show these cards even if /nature-live/status omits themes (cached deploy, API error). */
+function naturePreviewFetchUrl(themeId) {
+  if (typeof AdminClient.naturePreviewUrl === 'function') {
+    return AdminClient.naturePreviewUrl(themeId);
+  }
+  const base = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : '/api';
+  return `${base}/admin/nature-live/${themeId}/preview`;
+}
+
 const NATURE_THEME_LIST = [
   { id: 'rain', label: 'Rain' },
   { id: 'thunder', label: 'Thunder' },
@@ -2131,7 +2139,7 @@ const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
       setMediaUrl('');
       try {
         const token = AdminClient.getToken();
-        const res = await fetch(AdminClient.naturePreviewUrl(themeId), {
+        const res = await fetch(naturePreviewFetchUrl(themeId), {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!res.ok) {
