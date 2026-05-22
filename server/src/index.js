@@ -81,8 +81,9 @@ async function startServer() {
   app.use('/api/editors', editorsRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/stats', statsRouter);
-  app.use('/api/admin', adminRouter);
+  // Nature Live before /api/admin — admin router's requireAdmin blocks unmatched /api/admin/* paths
   app.use('/api/admin/nature-live', natureLiveRouter);
+  app.use('/api/admin', adminRouter);
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
   app.use('/api/authors', authorsRouter);
