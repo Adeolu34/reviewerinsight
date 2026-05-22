@@ -43,6 +43,23 @@ Optional: store token in env `NATURE_YOUTUBE_REFRESH_TOKEN` instead of MongoDB `
 | `NATURE_VIDEO_BITRATE` | No | Default `2500k` |
 | `NATURE_STREAM_RESOLUTION` | No | Default `1920:1080` |
 
+## Automatic storage cleanup
+
+The server runs **storage cleanup** on a schedule (default every **6 hours**, plus **60s after boot** and after each **Export 1h test** completes).
+
+It removes:
+
+- Old **test_\*min.mp4** exports (default older than **72h**)
+- Orphan **audio_raw / video_raw / \_trim** temp files
+- Old **ffmpeg logs** under each theme
+- **Failed** book video files older than **14 days** (DB paths cleared)
+
+If free space on the nature volume drops below **`STORAGE_CLEANUP_MIN_FREE_MB`** (default **2048**), cleanup runs in **aggressive** mode (may delete old test exports even if still referenced).
+
+Manual trigger: `POST /api/admin/system/cleanup-storage` with optional `{ "aggressive": true }`.
+
+Admin **System** page JSON includes `storage.lastCleanup` and volume free space.
+
 ## Docker / hosting (same container as API)
 
 The Dockerfile already installs **ffmpeg**. For 7× 1080p streams plan roughly:

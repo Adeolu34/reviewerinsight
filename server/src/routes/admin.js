@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const AgentRun = require('../models/AgentRun');
@@ -569,6 +570,18 @@ router.post('/books/:id/retry', async (req, res, next) => {
   }
 });
 
+// ─── POST /api/admin/system/cleanup-storage ─────────────────────
+router.post('/system/cleanup-storage', async (req, res, next) => {
+  try {
+    const storageCleanup = require('../services/storageCleanup');
+    const aggressive = !!req.body?.aggressive;
+    const result = await storageCleanup.runStorageCleanup({ reason: 'manual', aggressive });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── GET /api/admin/system ──────────────────────────────────────
 router.get('/system', async (req, res, next) => {
   try {
@@ -613,9 +626,19 @@ router.get('/system', async (req, res, next) => {
       return { ...s, nextRun: next.toISOString() };
     });
 
+    const storageCleanup = require('../services/storageCleanup');
+    const natureDir = process.env.NATURE_LIVE_DIR || path.join(__dirname, '../../../nature-live');
+    const videoDir = process.env.VIDEO_OUTPUT_DIR || path.join(__dirname, '../../../videos');
+
     res.json({
       health: dbConnected ? 'healthy' : 'degraded',
       uptime: Math.floor(process.uptime()),
+      storage: {
+        lastCleanup: storageCleanup.getLastCleanupResult(),
+        volumeNature: await storageCleanup.getVolumeFreeMb(natureDir),
+        volumeVideos: await storageCleanup.getVolumeFreeMb(videoDir),
+        cleanupEnabled: !['0', 'false', 'no', 'off'].includes(String(process.env.STORAGE_CLEANUP_ENABLED || 'true').toLowerCase()),
+      },
       database: { connected: dbConnected, ping: dbPing },
       config: {
         llmProvider: config.openrouterKey ? 'openrouter' : 'openai',

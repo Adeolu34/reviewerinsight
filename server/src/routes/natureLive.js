@@ -344,6 +344,8 @@ router.post('/:themeId/export-test', async (req, res, next) => {
           { $set: { status: 'ready', testExportPath: outPath, testExportMinutes: minutes, lastError: null } },
         );
         logger.info(`[NatureLive] Test export ready ${themeId} ${minutes}min`);
+        const storageCleanup = require('../services/storageCleanup');
+        storageCleanup.runStorageCleanup({ reason: 'after-export' }).catch(() => {});
       })
       .catch(async (err) => {
         await NatureStream.findOneAndUpdate(

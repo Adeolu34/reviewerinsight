@@ -224,7 +224,9 @@ async function startServer() {
   logger.info('VideoAgent schedule: daily at 3:00 AM, 9:00 AM, 3:00 PM and 9:00 PM UTC');
 
   const natureSupervisor = require('./services/natureStreamSupervisor');
+  const storageCleanup = require('./services/storageCleanup');
   natureSupervisor.startWatchdogCron();
+  storageCleanup.startStorageCleanupCron();
   natureSupervisor.resumeLiveOnStartup().catch((err) => {
     logger.error(`[NatureStream] Startup resume failed: ${err.message}`);
   });
