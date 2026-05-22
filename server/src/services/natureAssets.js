@@ -5,7 +5,8 @@ const { promisify } = require('util');
 const https = require('https');
 const logger = require('../utils/logger');
 const { getTheme } = require('../config/natureThemes');
-const { downloadNatureVideo } = require('./pexels');
+const { generateSoundEffectFile } = require('./elevenLabs');
+const { downloadNatureVideo } = require('./stockVideo');
 
 const execFileAsync = promisify(execFile);
 
@@ -31,8 +32,65 @@ function runFfmpeg(args, label) {
     });
 }
 
+function getAudioProviderPreference() {
+  const pref = (process.env.NATURE_AUDIO_PROVIDER || 'auto').trim().toLowerCase();
+  if (['elevenlabs', 'freesound', 'noise'].includes(pref)) return pref;
+  return 'auto';
+}
+
 /**
- * Download ambient audio from Freesound (CC0 filter) or generate silent placeholder via ffmpeg noise.
+ * Ambient audio: ElevenLabs SFX → Freesound CC0 → ffmpeg procedural noise.
+ */
+async function downloadAmbientAudio(theme, destPath, durationSec = 30) {
+  const prompt = theme.audioPrompt || theme.audioQuery;
+  const pref = getAudioProviderPreference();
+
+  const tryElevenLabs = pref === 'elevenlabs' || pref === 'auto';
+  if (tryElevenLabs && process.env.ELEVENLABS_API_KEY) {
+    try {
+      await generateSoundEffectFile(prompt, destPath, {
+        durationSeconds: Math.min(30, durationSec),
+        promptInfluence: parseFloat(process.env.NATURE_ELEVENLABS_INFLUENCE || '0.65', 10),
+        loop: process.env.NATURE_ELEVENLABS_LOOP !== 'false',
+      });
+      await trimAudioFade(destPath, durationSec);
+      return { path: destPath, source: 'elevenlabs' };
+    } catch (err) {
+      logger.warn(`[NatureAssets] ElevenLabs SFX failed (${err.message})`);
+      if (pref === 'elevenlabs') throw err;
+    }
+  } else if (pref === 'elevenlabs') {
+    throw new Error('ELEVENLABS_API_KEY not set (NATURE_AUDIO_PROVIDER=elevenlabs)');
+  }
+
+  if (pref === 'freesound' || pref === 'auto') {
+    try {
+      await downloadFreesoundAudio(theme.audioQuery, destPath, durationSec);
+      return { path: destPath, source: 'freesound' };
+    } catch (err) {
+      logger.warn(`[NatureAssets] Freesound failed (${err.message})`);
+      if (pref === 'freesound') throw err;
+    }
+  }
+
+  await generateNoiseAmbient(destPath, durationSec, theme.id);
+  return { path: destPath, source: 'noise' };
+}
+
+async function trimAudioFade(destPath, durationSec) {
+  const trimmed = destPath.replace(/\.mp3$/, '_trim.mp3');
+  await runFfmpeg([
+    '-y', '-i', destPath,
+    '-t', String(durationSec),
+    '-af', `afade=t=in:st=0:d=2,afade=t=out:st=${durationSec - 2}:d=2`,
+    '-c:a', 'libmp3lame', '-q:a', '4',
+    trimmed,
+  ], 'trim-elevenlabs');
+  fs.renameSync(trimmed, destPath);
+}
+
+/**
+ * Download ambient audio from Freesound (CC0 filter).
  */
 async function downloadFreesoundAudio(query, destPath, durationSec = 30) {
   const apiKey = process.env.FREESOUND_API_KEY;
@@ -182,14 +240,16 @@ async function generateAssetsForTheme(themeId) {
 
   logger.info(`[NatureAssets] Generating assets for ${themeId}`);
 
-  await downloadFreesoundAudio(theme.audioQuery, rawAudio, 30);
+  const audioResult = await downloadAmbientAudio(theme, rawAudio, 30);
   await buildSeamlessAudioLoop(rawAudio, audioPath, 30);
 
+  let videoProvider = null;
   try {
-    await downloadNatureVideo(theme.videoQuery, rawVideo);
+    const videoResult = await downloadNatureVideo(theme.videoQuery, rawVideo);
+    videoProvider = videoResult.provider;
     await normalizeVideoLoop(rawVideo, videoPath, 45);
   } catch (err) {
-    logger.warn(`[NatureAssets] Pexels failed (${err.message}) — color loop fallback`);
+    logger.warn(`[NatureAssets] Stock video failed (${err.message}) — color loop fallback`);
     await runFfmpeg([
       '-y',
       '-f', 'lavfi', '-i', 'color=c=0x1a3a2a:s=1920x1080:d=30',
@@ -211,6 +271,8 @@ async function generateAssetsForTheme(themeId) {
     thumbnailPath,
     title: theme.title,
     description: theme.description,
+    audioSource: audioResult.source,
+    videoProvider,
   };
 }
 

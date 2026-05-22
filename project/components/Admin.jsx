@@ -2262,7 +2262,7 @@ const NatureLiveSection = () => {
           <h1 style={{ fontFamily: T.serif, fontSize: 32, margin: 0 }}>Nature Live</h1>
           <p style={{ fontFamily: T.sans, fontSize: 13, color: T.muted, marginTop: 8, maxWidth: 640, lineHeight: 1.6 }}>
             Up to {data?.maxConcurrent || 7} concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your <strong>nature</strong> YouTube channel.
-            Licensed stock (Pexels) + CC0 audio (Freesound) recommended.
+            Video: Pexels + Pixabay. Audio: ElevenLabs sound effects (or Freesound fallback).
           </p>
         </div>
         <Btn variant="danger" disabled={busy || !data?.liveCount} onClick={handleStopAll}>Stop all ({data?.liveCount || 0} live)</Btn>
@@ -2270,8 +2270,9 @@ const NatureLiveSection = () => {
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Metric label="Live now" value={data?.liveCount ?? '—'} />
-        <Metric label="Pexels API" value={data?.pexelsConfigured ? 'OK' : 'Missing'} />
-        <Metric label="Freesound" value={data?.freesoundConfigured ? 'OK' : 'Noise fallback'} />
+        <Metric label="ElevenLabs" value={data?.elevenLabsConfigured ? 'OK' : 'Missing'} />
+        <Metric label="Stock video" value={(data?.videoProvidersConfigured || []).join(', ') || 'No keys'} />
+        <Metric label="Freesound" value={data?.freesoundConfigured ? 'OK' : 'Fallback'} />
       </div>
 
       <NatureYoutubeConnectionCard />

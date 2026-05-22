@@ -4773,7 +4773,7 @@ const NatureLiveSection = () => {
       maxWidth: 640,
       lineHeight: 1.6
     }
-  }, "Up to ", data?.maxConcurrent || 7, " concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your ", /*#__PURE__*/React.createElement("strong", null, "nature"), " YouTube channel. Licensed stock (Pexels) + CC0 audio (Freesound) recommended.")), /*#__PURE__*/React.createElement(Btn, {
+  }, "Up to ", data?.maxConcurrent || 7, " concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your ", /*#__PURE__*/React.createElement("strong", null, "nature"), " YouTube channel. Video: Pexels + Pixabay. Audio: ElevenLabs sound effects (or Freesound fallback).")), /*#__PURE__*/React.createElement(Btn, {
     variant: "danger",
     disabled: busy || !data?.liveCount,
     onClick: handleStopAll
@@ -4787,11 +4787,14 @@ const NatureLiveSection = () => {
     label: "Live now",
     value: data?.liveCount ?? '—'
   }), /*#__PURE__*/React.createElement(Metric, {
-    label: "Pexels API",
-    value: data?.pexelsConfigured ? 'OK' : 'Missing'
+    label: "ElevenLabs",
+    value: data?.elevenLabsConfigured ? 'OK' : 'Missing'
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Stock video",
+    value: (data?.videoProvidersConfigured || []).join(', ') || 'No keys'
   }), /*#__PURE__*/React.createElement(Metric, {
     label: "Freesound",
-    value: data?.freesoundConfigured ? 'OK' : 'Noise fallback'
+    value: data?.freesoundConfigured ? 'OK' : 'Fallback'
   })), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null), loading && !data ? /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: T.mono,

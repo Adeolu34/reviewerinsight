@@ -3,6 +3,7 @@ const AppSetting = require('../models/AppSetting');
 const NatureStream = require('../models/NatureStream');
 const { NATURE_THEMES } = require('../config/natureThemes');
 const natureYoutube = require('../services/natureYoutube');
+const stockVideo = require('../services/stockVideo');
 const { generateAssetsForTheme } = require('../services/natureAssets');
 const supervisor = require('../services/natureStreamSupervisor');
 const requireAdmin = require('../middleware/requireAdmin');
@@ -104,7 +105,12 @@ router.get('/status', async (req, res, next) => {
       },
       maxConcurrent: 7,
       liveCount,
+      elevenLabsConfigured: !!process.env.ELEVENLABS_API_KEY,
+      audioProvider: process.env.NATURE_AUDIO_PROVIDER || 'auto',
       pexelsConfigured: !!process.env.PEXELS_API_KEY,
+      pixabayConfigured: !!process.env.PIXABAY_API_KEY,
+      videoProviders: stockVideo.getVideoProviders(),
+      videoProvidersConfigured: stockVideo.getConfiguredProviders(),
       freesoundConfigured: !!process.env.FREESOUND_API_KEY,
       streams: streams.map((s) => ({
         ...s,

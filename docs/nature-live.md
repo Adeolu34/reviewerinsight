@@ -28,8 +28,12 @@ Optional: store token in env `NATURE_YOUTUBE_REFRESH_TOKEN` instead of MongoDB `
 | `YOUTUBE_CLIENT_SECRET` | Yes | OAuth client |
 | `NATURE_YOUTUBE_REFRESH_TOKEN` | No* | Nature channel refresh token (*or DB after OAuth) |
 | `NATURE_YOUTUBE_REDIRECT_URI` | No | Defaults to `{origin}/api/admin/nature-live/youtube/callback` |
-| `PEXELS_API_KEY` | Recommended | Looping nature video clips |
-| `FREESOUND_API_KEY` | Optional | CC0 ambient audio; without it, ffmpeg pink-noise fallback |
+| `ELEVENLABS_API_KEY` | Recommended | Ambient audio via Sound Effects API (reuses book-video key) |
+| `NATURE_AUDIO_PROVIDER` | No | `auto` (default), `elevenlabs`, `freesound`, or `noise` |
+| `PEXELS_API_KEY` | Recommended | Stock nature video (first provider in chain) |
+| `PIXABAY_API_KEY` | Recommended | Free stock video fallback — [pixabay.com/api/docs](https://pixabay.com/api/docs/) |
+| `NATURE_VIDEO_PROVIDERS` | No | Comma order, default `pexels,pixabay` |
+| `FREESOUND_API_KEY` | Optional | CC0 ambient audio fallback if ElevenLabs unavailable |
 | `NATURE_LIVE_DIR` | No | Asset storage (default: `nature-live/` under repo) |
 | `NATURE_LIVE_AUTO_RESUME` | No | `true` = restart ffmpeg for streams marked `live` on boot |
 | `NATURE_WATCHDOG_INTERVAL_MS` | No | Default `60000` — restart dead encoders |
@@ -50,7 +54,9 @@ Example Coolify/env:
 ```env
 NATURE_LIVE_DIR=/var/data/reviewinsight/nature-live
 NATURE_LIVE_AUTO_RESUME=true
+ELEVENLABS_API_KEY=...
 PEXELS_API_KEY=...
+PIXABAY_API_KEY=...
 FREESOUND_API_KEY=...
 ```
 
@@ -69,7 +75,8 @@ Mount `/var/data/reviewinsight/nature-live` as a persistent volume.
 
 ## Compliance
 
-- Use licensed media (Pexels video, Freesound CC0) to reduce Content ID risk.
+- Use licensed media (Pexels/Pixabay video, ElevenLabs SFX or Freesound CC0) to reduce Content ID risk.
+- ElevenLabs SFX uses credits (~40/sec when duration is set); one 30s clip per theme on regenerate.
 - 24/7 streams may drop; watchdog + `NATURE_LIVE_AUTO_RESUME` help recover.
 
 ## API (admin JWT)
