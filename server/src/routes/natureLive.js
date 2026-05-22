@@ -1,9 +1,12 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const AppSetting = require('../models/AppSetting');
 const NatureStream = require('../models/NatureStream');
 const { NATURE_THEMES } = require('../config/natureThemes');
 const natureYoutube = require('../services/natureYoutube');
 const stockVideo = require('../services/stockVideo');
+const freesound = require('../services/freesound');
 const { generateAssetsForTheme } = require('../services/natureAssets');
 const supervisor = require('../services/natureStreamSupervisor');
 const requireAdmin = require('../middleware/requireAdmin');
@@ -111,10 +114,20 @@ router.get('/status', async (req, res, next) => {
       pixabayConfigured: !!process.env.PIXABAY_API_KEY,
       videoProviders: stockVideo.getVideoProviders(),
       videoProvidersConfigured: stockVideo.getConfiguredProviders(),
-      freesoundConfigured: !!process.env.FREESOUND_API_KEY,
-      streams: streams.map((s) => ({
-        ...s,
-        hasAssets: !!(s.audioPath && s.videoPath),
+      freesoundConfigured: freesound.isConfigured(),
+      streams: await Promise.all(streams.map(async (s) => {
+        let youtubeLifeCycle = null;
+        if (s.youtubeBroadcastId && (s.status === 'preview' || s.status === 'live' || s.status === 'starting')) {
+          try {
+            const b = await natureYoutube.getBroadcastStatus(s.youtubeBroadcastId);
+            youtubeLifeCycle = b?.status?.lifeCycleStatus || null;
+          } catch (_) {}
+        }
+        return {
+          ...s,
+          hasAssets: !!(s.audioPath && s.videoPath && fs.existsSync(s.audioPath) && fs.existsSync(s.videoPath)),
+          youtubeLifeCycle,
+        };
       })),
       themes: NATURE_THEMES,
     });
@@ -172,7 +185,7 @@ router.post('/:themeId/generate-assets', async (req, res, next) => {
       doc = await NatureStream.create({ themeId, title: theme.title, description: theme.description });
     }
 
-    if (doc.status === 'live') {
+    if (['live', 'preview', 'starting'].includes(doc.status)) {
       return res.status(400).json({ error: 'Stop stream before regenerating assets' });
     }
 
@@ -211,6 +224,72 @@ router.post('/:themeId/generate-assets', async (req, res, next) => {
   }
 });
 
+router.get('/:themeId/preview/video', async (req, res, next) => {
+  try {
+    const doc = await NatureStream.findOne({ themeId: req.params.themeId });
+    if (!doc?.videoPath || !fs.existsSync(doc.videoPath)) {
+      return res.status(404).json({ error: 'No video assets — click Regenerate first' });
+    }
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    return res.sendFile(path.resolve(doc.videoPath));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:themeId/preview/audio', async (req, res, next) => {
+  try {
+    const doc = await NatureStream.findOne({ themeId: req.params.themeId });
+    if (!doc?.audioPath || !fs.existsSync(doc.audioPath)) {
+      return res.status(404).json({ error: 'No audio assets — click Regenerate first' });
+    }
+    res.setHeader('Content-Type', 'audio/mpeg');
+    return res.sendFile(path.resolve(doc.audioPath));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:themeId/broadcast-status', async (req, res, next) => {
+  try {
+    const doc = await NatureStream.findOne({ themeId: req.params.themeId });
+    if (!doc?.youtubeBroadcastId) {
+      return res.json({ configured: false });
+    }
+    const broadcast = await natureYoutube.getBroadcastStatus(doc.youtubeBroadcastId);
+    res.json({
+      configured: true,
+      lifeCycleStatus: broadcast?.status?.lifeCycleStatus || null,
+      streamStatus: broadcast?.status?.streamStatus || null,
+      privacyStatus: broadcast?.status?.privacyStatus || null,
+      youtubeWatchUrl: doc.youtubeWatchUrl,
+      youtubeStudioUrl: doc.youtubeStudioUrl || `https://studio.youtube.com/video/${doc.youtubeBroadcastId}/livestreaming`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:themeId/prepare', async (req, res, next) => {
+  try {
+    const doc = await supervisor.prepareStream(req.params.themeId);
+    res.json({ ok: true, stream: doc, message: 'Encoder starting — YouTube preview in ~20s. Open Studio link when status is preview.' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/:themeId/go-live', async (req, res, next) => {
+  try {
+    const doc = await supervisor.publishStream(req.params.themeId);
+    res.json({ ok: true, stream: doc });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/** One-click: prepare then auto go-live after preview window (set NATURE_SKIP_PREVIEW=true) */
 router.post('/:themeId/start', async (req, res, next) => {
   try {
     const doc = await supervisor.startStream(req.params.themeId);

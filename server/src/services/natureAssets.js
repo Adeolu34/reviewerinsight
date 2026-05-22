@@ -7,6 +7,7 @@ const logger = require('../utils/logger');
 const { getTheme } = require('../config/natureThemes');
 const { generateSoundEffectFile } = require('./elevenLabs');
 const { downloadNatureVideo } = require('./stockVideo');
+const freesound = require('./freesound');
 
 const execFileAsync = promisify(execFile);
 
@@ -93,35 +94,16 @@ async function trimAudioFade(destPath, durationSec) {
  * Download ambient audio from Freesound (CC0 filter).
  */
 async function downloadFreesoundAudio(query, destPath, durationSec = 30) {
-  const apiKey = process.env.FREESOUND_API_KEY;
-  if (!apiKey) {
-    logger.warn('[NatureAssets] FREESOUND_API_KEY missing — using ffmpeg ambient noise');
-    return generateNoiseAmbient(destPath, durationSec, query);
+  if (!freesound.isConfigured()) {
+    throw new Error('Freesound not configured (FREESOUND_API_KEY or FREESOUND_CLIENT_SECRET)');
   }
 
-  const q = encodeURIComponent(query);
-  const filter = encodeURIComponent('license:"Creative Commons 0"');
-  const url = `https://freesound.org/apiv2/search/text/?query=${q}&filter=${filter}&fields=id,name,previews,duration&page_size=5`;
-
-  const json = await new Promise((resolve, reject) => {
-    https.get(url, {
-      headers: { 'User-Agent': 'ReviewerInsight/1.0', Authorization: `Token ${apiKey}` },
-    }, (res) => {
-      let data = '';
-      res.on('data', (c) => { data += c; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-      });
-    }).on('error', reject);
-  });
-
+  const json = await freesound.searchCc0Sounds(query, 5);
   const results = json.results || [];
-  const pick = results.find((r) => r.duration >= 20 && r.duration <= 120) || results[0];
-  if (!pick?.previews?.['preview-hq-mp3'] && !pick?.previews?.['preview-lq-mp3']) {
-    return generateNoiseAmbient(destPath, durationSec, query);
+  const previewUrl = freesound.pickPreviewUrl(results);
+  if (!previewUrl) {
+    throw new Error(`No CC0 preview for "${query}"`);
   }
-
-  const previewUrl = pick.previews['preview-hq-mp3'] || pick.previews['preview-lq-mp3'];
   await downloadHttps(previewUrl, destPath);
 
   const trimmed = destPath.replace(/\.mp3$/, '_trim.mp3');

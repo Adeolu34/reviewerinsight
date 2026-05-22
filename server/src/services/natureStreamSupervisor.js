@@ -33,7 +33,7 @@ async function countLiveInDb() {
 /**
  * Start ffmpeg RTMP encoder for a theme (expects assets + YouTube session on doc).
  */
-async function startEncoder(doc) {
+async function startEncoder(doc, { streamStatus = 'live' } = {}) {
   if (!doc.videoPath || !doc.audioPath || !fs.existsSync(doc.videoPath) || !fs.existsSync(doc.audioPath)) {
     throw new Error('Missing video or audio assets — run generate-assets first');
   }
@@ -91,7 +91,7 @@ async function startEncoder(doc) {
 
   await NatureStream.findByIdAndUpdate(doc._id, {
     $set: {
-      status: 'live',
+      status: streamStatus,
       ffmpegPid: proc.pid,
       startedAt: new Date(),
       lastError: null,
@@ -100,6 +100,34 @@ async function startEncoder(doc) {
 
   logger.info(`[NatureStream] Encoder started ${doc.themeId} pid=${proc.pid} → ${rtmpUrl.replace(doc.streamKey, '***')}`);
   return proc.pid;
+}
+
+/**
+ * Make a prepared stream public on YouTube.
+ */
+async function publishStream(themeId) {
+  const doc = await NatureStream.findOne({ themeId });
+  if (!doc) throw new Error('Unknown theme');
+  if (!doc.youtubeBroadcastId) throw new Error('No YouTube broadcast — run Prepare first');
+  if (doc.status !== 'preview' && doc.status !== 'starting') {
+    throw new Error(`Cannot go live from status "${doc.status}"`);
+  }
+
+  await natureYoutube.goLive(doc.youtubeBroadcastId);
+  await NatureStream.findByIdAndUpdate(doc._id, {
+    $set: { status: 'live', lastError: null },
+  });
+  return await NatureStream.findOne({ themeId });
+}
+
+/** @deprecated alias — use prepareStream + publishStream */
+async function startStream(themeId) {
+  const doc = await prepareStream(themeId);
+  if (process.env.NATURE_SKIP_PREVIEW === 'true') {
+    await new Promise((r) => setTimeout(r, 22000));
+    return publishStream(themeId);
+  }
+  return doc;
 }
 
 async function stopEncoder(themeId, { skipYoutubeEnd = false } = {}) {
@@ -126,16 +154,16 @@ async function stopEncoder(themeId, { skipYoutubeEnd = false } = {}) {
 }
 
 async function stopAll() {
-  const live = await NatureStream.find({ status: { $in: ['live', 'starting'] } });
+  const live = await NatureStream.find({ status: { $in: ['live', 'starting', 'preview'] } });
   for (const doc of live) {
     await stopEncoder(doc.themeId);
   }
 }
 
 /**
- * Full start: YouTube live session + ffmpeg (doc must be ready).
+ * Push RTMP to YouTube and enter testing/preview (not public live yet).
  */
-async function startStream(themeId) {
+async function prepareStream(themeId) {
   const liveCount = await countLiveInDb();
   if (liveCount >= MAX_CONCURRENT_LIVE) {
     throw new Error(`Maximum ${MAX_CONCURRENT_LIVE} concurrent live streams reached`);
@@ -153,8 +181,8 @@ async function startStream(themeId) {
     });
   }
 
-  if (doc.status === 'live') {
-    throw new Error('Stream already live');
+  if (doc.status === 'live' || doc.status === 'preview') {
+    throw new Error('Stream already running — stop it first');
   }
 
   if (!doc.audioPath || !doc.videoPath) {
@@ -175,18 +203,29 @@ async function startStream(themeId) {
     await NatureStream.findByIdAndUpdate(doc._id, { $set: { ...session, title, description } });
 
     doc = await NatureStream.findOne({ themeId });
-    await startEncoder(doc);
+    await startEncoder(doc, { streamStatus: 'starting' });
 
-    if (doc.youtubeBroadcastId) {
+    const broadcastId = doc.youtubeBroadcastId;
+    if (broadcastId) {
       setTimeout(async () => {
         try {
-          await natureYoutube.goLive(doc.youtubeBroadcastId);
+          await natureYoutube.enterPreviewMode(broadcastId);
+          await NatureStream.findOneAndUpdate(
+            { themeId },
+            { $set: { status: 'preview', lastError: null } },
+          );
+          logger.info(`[NatureStream] ${themeId} in YouTube preview (testing)`);
         } catch (err) {
-          logger.warn(`[NatureStream] goLive delayed: ${err.message}`);
+          logger.warn(`[NatureStream] preview transition: ${err.message}`);
+          await NatureStream.findOneAndUpdate(
+            { themeId },
+            { $set: { lastError: `Preview: ${err.message}` } },
+          );
         }
-      }, 15000);
+      }, 20000);
     }
 
+    await NatureStream.findByIdAndUpdate(doc._id, { $set: { status: 'starting' } });
     return await NatureStream.findOne({ themeId });
   } catch (err) {
     await NatureStream.findByIdAndUpdate(doc._id, {
@@ -197,7 +236,7 @@ async function startStream(themeId) {
 }
 
 async function watchdogTick() {
-  const liveDocs = await NatureStream.find({ status: 'live' });
+  const liveDocs = await NatureStream.find({ status: { $in: ['live', 'preview'] } });
   for (const doc of liveDocs) {
     const proc = processes.get(doc.themeId);
     const running = proc && proc.exitCode === null;
@@ -251,6 +290,8 @@ function startWatchdogCron() {
 }
 
 module.exports = {
+  prepareStream,
+  publishStream,
   startStream,
   stopEncoder,
   stopAll,

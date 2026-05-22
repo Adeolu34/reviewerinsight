@@ -113,9 +113,9 @@ async function createLiveSession({ title, description }) {
         selfDeclaredMadeForKids: false,
       },
       contentDetails: {
-        enableAutoStart: true,
+        enableAutoStart: false,
         enableAutoStop: false,
-        monitorStream: { enableMonitorStream: false },
+        monitorStream: { enableMonitorStream: true },
       },
     },
   });
@@ -129,6 +129,7 @@ async function createLiveSession({ title, description }) {
   });
 
   const watchUrl = `https://www.youtube.com/watch?v=${broadcastId}`;
+  const studioUrl = `https://studio.youtube.com/video/${broadcastId}/livestreaming`;
 
   logger.info(`[NatureYouTube] Live session created broadcast=${broadcastId} stream=${streamId}`);
 
@@ -138,7 +139,12 @@ async function createLiveSession({ title, description }) {
     ingestionAddress,
     streamKey: streamName,
     youtubeWatchUrl: watchUrl,
+    youtubeStudioUrl: studioUrl,
   };
+}
+
+async function enterPreviewMode(broadcastId) {
+  await transitionBroadcast(broadcastId, 'testing');
 }
 
 async function transitionBroadcast(broadcastId, status) {
@@ -189,6 +195,7 @@ module.exports = {
   getClient,
   getChannelInfo,
   createLiveSession,
+  enterPreviewMode,
   goLive,
   endBroadcast,
   getBroadcastStatus,

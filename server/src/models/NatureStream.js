@@ -9,7 +9,7 @@ const natureStreamSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['idle', 'generating', 'ready', 'starting', 'live', 'error', 'stopped'],
+    enum: ['idle', 'generating', 'ready', 'starting', 'preview', 'live', 'error', 'stopped'],
     default: 'idle',
     index: true,
   },
@@ -23,6 +23,7 @@ const natureStreamSchema = new mongoose.Schema({
   ingestionAddress: { type: String },
   streamKey: { type: String },
   youtubeWatchUrl: { type: String },
+  youtubeStudioUrl: { type: String },
   ffmpegPid: { type: Number },
   lastError: { type: String },
   startedAt: { type: Date },

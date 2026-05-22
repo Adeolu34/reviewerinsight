@@ -4497,9 +4497,124 @@ const NATURE_STATUS_COLORS = {
   generating: T.warn,
   ready: T.info,
   starting: T.warn,
+  preview: T.info,
   live: T.ok,
   error: T.err,
   stopped: T.muted
+};
+const NatureAssetPreviewModal = ({
+  themeId,
+  label,
+  onClose
+}) => {
+  const [videoUrl, setVideoUrl] = React.useState('');
+  const [audioUrl, setAudioUrl] = React.useState('');
+  const [err, setErr] = React.useState('');
+  React.useEffect(() => {
+    let cancelled = false;
+    const token = AdminClient.getToken();
+    const headers = token ? {
+      Authorization: `Bearer ${token}`
+    } : {};
+    const load = async (path, setter) => {
+      const res = await fetch(path, {
+        headers
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+      const blob = await res.blob();
+      if (!cancelled) setter(URL.createObjectURL(blob));
+    };
+    (async () => {
+      try {
+        await Promise.all([load(AdminClient.naturePreviewVideoUrl(themeId), setVideoUrl), load(AdminClient.naturePreviewAudioUrl(themeId), setAudioUrl)]);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || 'Preview failed');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [themeId]);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,.75)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: T.card,
+      border: `1px solid ${T.border}`,
+      borderRadius: 10,
+      padding: 20,
+      maxWidth: 720,
+      width: '100%'
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontFamily: T.serif,
+      margin: 0
+    }
+  }, "Preview \u2014 ", label), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: onClose
+  }, "Close")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: T.muted,
+      marginTop: 0
+    }
+  }, "Local loop files before YouTube. Video is silent; audio plays separately (same as the live stream)."), err ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: T.err,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, err) : /*#__PURE__*/React.createElement(React.Fragment, null, videoUrl ? /*#__PURE__*/React.createElement("video", {
+    src: videoUrl,
+    controls: true,
+    autoPlay: true,
+    loop: true,
+    muted: true,
+    playsInline: true,
+    style: {
+      width: '100%',
+      borderRadius: 8,
+      background: '#000',
+      maxHeight: 320
+    }
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      color: T.muted,
+      fontSize: 12
+    }
+  }, "Loading video\u2026"), audioUrl && /*#__PURE__*/React.createElement("audio", {
+    src: audioUrl,
+    controls: true,
+    autoPlay: true,
+    loop: true,
+    style: {
+      width: '100%',
+      marginTop: 12
+    }
+  }))));
 };
 const NatureYoutubeConnectionCard = () => {
   const [status, setStatus] = React.useState(null);
@@ -4626,8 +4741,10 @@ const NatureStreamCard = ({
   setBusy
 }) => {
   const [localMsg, setLocalMsg] = React.useState('');
+  const [showPreview, setShowPreview] = React.useState(false);
   const st = stream?.status || 'idle';
   const color = NATURE_STATUS_COLORS[st] || T.dim;
+  const studioUrl = stream.youtubeStudioUrl || (stream.youtubeBroadcastId ? `https://studio.youtube.com/video/${stream.youtubeBroadcastId}/livestreaming` : null);
   const act = async (fn, label) => {
     setBusy(true);
     setLocalMsg('');
@@ -4683,7 +4800,14 @@ const NatureStreamCard = ({
       marginBottom: 8,
       wordBreak: 'break-word'
     }
-  }, stream.lastError), /*#__PURE__*/React.createElement("div", {
+  }, stream.lastError), stream.youtubeLifeCycle && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontFamily: T.mono,
+      color: T.dim,
+      marginBottom: 8
+    }
+  }, "YouTube: ", stream.youtubeLifeCycle), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexWrap: 'wrap',
@@ -4691,23 +4815,41 @@ const NatureStreamCard = ({
     }
   }, /*#__PURE__*/React.createElement(Btn, {
     small: true,
-    disabled: busy || st === 'live' || st === 'generating',
-    onClick: () => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Assets queued')
-  }, "Regenerate"), /*#__PURE__*/React.createElement(Btn, {
+    disabled: busy || st === 'live' || st === 'generating' || st === 'preview' || st === 'starting',
+    onClick: () => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Building assets…')
+  }, "1. Build assets"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    disabled: busy || !stream.hasAssets,
+    onClick: () => setShowPreview(true)
+  }, "2. Preview local"), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "primary",
-    disabled: busy || st === 'live' || st === 'generating' || !stream.hasAssets,
-    onClick: () => act(() => AdminClient.startNatureStream(stream.themeId), 'Starting')
-  }, "Start"), /*#__PURE__*/React.createElement(Btn, {
+    disabled: busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating',
+    onClick: () => act(() => AdminClient.prepareNatureStream(stream.themeId), 'Preparing YouTube preview…')
+  }, "3. Prepare (YT preview)"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    disabled: busy || st !== 'preview' && st !== 'starting',
+    onClick: () => act(() => AdminClient.goLiveNatureStream(stream.themeId), 'Now live')
+  }, "4. Go live"), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "danger",
-    disabled: busy || st !== 'live' && st !== 'starting',
+    disabled: busy || !['live', 'starting', 'preview'].includes(st),
     onClick: () => act(() => AdminClient.stopNatureStream(stream.themeId), 'Stopped')
-  }, "Stop"), stream.youtubeWatchUrl && /*#__PURE__*/React.createElement(Btn, {
+  }, "Stop"), studioUrl && ['starting', 'preview', 'live'].includes(st) && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => window.open(studioUrl, '_blank')
+  }, "Studio \u2197"), stream.youtubeWatchUrl && ['preview', 'live'].includes(st) && /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "ghost",
     onClick: () => window.open(stream.youtubeWatchUrl, '_blank')
-  }, "YouTube \u2197")), localMsg && /*#__PURE__*/React.createElement("div", {
+  }, "Watch \u2197")), showPreview && /*#__PURE__*/React.createElement(NatureAssetPreviewModal, {
+    themeId: stream.themeId,
+    label: theme?.label || stream.themeId,
+    onClose: () => setShowPreview(false)
+  }), localMsg && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,
       fontSize: 11,
@@ -4725,7 +4867,7 @@ const NatureLiveSection = () => {
     refresh
   } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
   React.useEffect(() => {
-    const hasGenerating = data?.streams?.some(s => s.status === 'generating' || s.status === 'starting');
+    const hasGenerating = data?.streams?.some(s => ['generating', 'starting', 'preview'].includes(s.status));
     if (!hasGenerating) return undefined;
     const t = setInterval(() => setPoll(p => p + 1), 5000);
     return () => clearInterval(t);
@@ -4773,7 +4915,7 @@ const NatureLiveSection = () => {
       maxWidth: 640,
       lineHeight: 1.6
     }
-  }, "Up to ", data?.maxConcurrent || 7, " concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your ", /*#__PURE__*/React.createElement("strong", null, "nature"), " YouTube channel. Video: Pexels + Pixabay. Audio: ElevenLabs sound effects (or Freesound fallback).")), /*#__PURE__*/React.createElement(Btn, {
+  }, "Workflow: ", /*#__PURE__*/React.createElement("strong", null, "Build assets"), " \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Preview local"), " \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Prepare"), " (private YouTube test) \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Go live"), " (public). Video: Pexels + Pixabay. Audio: ElevenLabs or Freesound.")), /*#__PURE__*/React.createElement(Btn, {
     variant: "danger",
     disabled: busy || !data?.liveCount,
     onClick: handleStopAll

@@ -2102,7 +2102,66 @@ const VideosSection = () => {
 
 // ─── SECTION: Nature Live ────────────────────────────────────────
 const NATURE_STATUS_COLORS = {
-  idle: T.dim, generating: T.warn, ready: T.info, starting: T.warn, live: T.ok, error: T.err, stopped: T.muted,
+  idle: T.dim, generating: T.warn, ready: T.info, starting: T.warn, preview: T.info, live: T.ok, error: T.err, stopped: T.muted,
+};
+
+const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
+  const [videoUrl, setVideoUrl] = React.useState('');
+  const [audioUrl, setAudioUrl] = React.useState('');
+  const [err, setErr] = React.useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const token = AdminClient.getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const load = async (path, setter) => {
+      const res = await fetch(path, { headers });
+      if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+      const blob = await res.blob();
+      if (!cancelled) setter(URL.createObjectURL(blob));
+    };
+    (async () => {
+      try {
+        await Promise.all([
+          load(AdminClient.naturePreviewVideoUrl(themeId), setVideoUrl),
+          load(AdminClient.naturePreviewAudioUrl(themeId), setAudioUrl),
+        ]);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || 'Preview failed');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [themeId]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={onClose}>
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: 20, maxWidth: 720, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 style={{ fontFamily: T.serif, margin: 0 }}>Preview — {label}</h3>
+          <Btn small variant="ghost" onClick={onClose}>Close</Btn>
+        </div>
+        <p style={{ fontSize: 12, color: T.muted, marginTop: 0 }}>Local loop files before YouTube. Video is silent; audio plays separately (same as the live stream).</p>
+        {err ? (
+          <div style={{ color: T.err, fontFamily: T.mono, fontSize: 12 }}>{err}</div>
+        ) : (
+          <>
+            {videoUrl ? (
+              <video src={videoUrl} controls autoPlay loop muted playsInline style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: 320 }} />
+            ) : (
+              <div style={{ fontFamily: T.mono, color: T.muted, fontSize: 12 }}>Loading video…</div>
+            )}
+            {audioUrl && (
+              <audio src={audioUrl} controls autoPlay loop style={{ width: '100%', marginTop: 12 }} />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const NatureYoutubeConnectionCard = () => {
@@ -2180,8 +2239,11 @@ const NatureYoutubeConnectionCard = () => {
 
 const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
   const [localMsg, setLocalMsg] = React.useState('');
+  const [showPreview, setShowPreview] = React.useState(false);
   const st = stream?.status || 'idle';
   const color = NATURE_STATUS_COLORS[st] || T.dim;
+  const studioUrl = stream.youtubeStudioUrl
+    || (stream.youtubeBroadcastId ? `https://studio.youtube.com/video/${stream.youtubeBroadcastId}/livestreaming` : null);
 
   const act = async (fn, label) => {
     setBusy(true);
@@ -2210,20 +2272,35 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
       {stream.lastError && (
         <div style={{ fontSize: 11, fontFamily: T.mono, color: T.err, marginBottom: 8, wordBreak: 'break-word' }}>{stream.lastError}</div>
       )}
+      {stream.youtubeLifeCycle && (
+        <div style={{ fontSize: 10, fontFamily: T.mono, color: T.dim, marginBottom: 8 }}>YouTube: {stream.youtubeLifeCycle}</div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <Btn small disabled={busy || st === 'live' || st === 'generating'} onClick={() => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Assets queued')}>
-          Regenerate
+        <Btn small disabled={busy || st === 'live' || st === 'generating' || st === 'preview' || st === 'starting'} onClick={() => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Building assets…')}>
+          1. Build assets
         </Btn>
-        <Btn small variant="primary" disabled={busy || st === 'live' || st === 'generating' || !stream.hasAssets} onClick={() => act(() => AdminClient.startNatureStream(stream.themeId), 'Starting')}>
-          Start
+        <Btn small variant="ghost" disabled={busy || !stream.hasAssets} onClick={() => setShowPreview(true)}>
+          2. Preview local
         </Btn>
-        <Btn small variant="danger" disabled={busy || (st !== 'live' && st !== 'starting')} onClick={() => act(() => AdminClient.stopNatureStream(stream.themeId), 'Stopped')}>
+        <Btn small variant="primary" disabled={busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating'} onClick={() => act(() => AdminClient.prepareNatureStream(stream.themeId), 'Preparing YouTube preview…')}>
+          3. Prepare (YT preview)
+        </Btn>
+        <Btn small variant="primary" disabled={busy || (st !== 'preview' && st !== 'starting')} onClick={() => act(() => AdminClient.goLiveNatureStream(stream.themeId), 'Now live')}>
+          4. Go live
+        </Btn>
+        <Btn small variant="danger" disabled={busy || !['live', 'starting', 'preview'].includes(st)} onClick={() => act(() => AdminClient.stopNatureStream(stream.themeId), 'Stopped')}>
           Stop
         </Btn>
-        {stream.youtubeWatchUrl && (
-          <Btn small variant="ghost" onClick={() => window.open(stream.youtubeWatchUrl, '_blank')}>YouTube ↗</Btn>
+        {studioUrl && ['starting', 'preview', 'live'].includes(st) && (
+          <Btn small variant="ghost" onClick={() => window.open(studioUrl, '_blank')}>Studio ↗</Btn>
+        )}
+        {stream.youtubeWatchUrl && ['preview', 'live'].includes(st) && (
+          <Btn small variant="ghost" onClick={() => window.open(stream.youtubeWatchUrl, '_blank')}>Watch ↗</Btn>
         )}
       </div>
+      {showPreview && (
+        <NatureAssetPreviewModal themeId={stream.themeId} label={theme?.label || stream.themeId} onClose={() => setShowPreview(false)} />
+      )}
       {localMsg && <div style={{ marginTop: 8, fontSize: 11, fontFamily: T.mono, color: localMsg.startsWith('✗') ? T.err : T.ok }}>{localMsg}</div>}
     </div>
   );
@@ -2235,7 +2312,7 @@ const NatureLiveSection = () => {
   const { resolved: data, loading, refresh } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
 
   React.useEffect(() => {
-    const hasGenerating = data?.streams?.some((s) => s.status === 'generating' || s.status === 'starting');
+    const hasGenerating = data?.streams?.some((s) => ['generating', 'starting', 'preview'].includes(s.status));
     if (!hasGenerating) return undefined;
     const t = setInterval(() => setPoll((p) => p + 1), 5000);
     return () => clearInterval(t);
@@ -2261,8 +2338,8 @@ const NatureLiveSection = () => {
         <div>
           <h1 style={{ fontFamily: T.serif, fontSize: 32, margin: 0 }}>Nature Live</h1>
           <p style={{ fontFamily: T.sans, fontSize: 13, color: T.muted, marginTop: 8, maxWidth: 640, lineHeight: 1.6 }}>
-            Up to {data?.maxConcurrent || 7} concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your <strong>nature</strong> YouTube channel.
-            Video: Pexels + Pixabay. Audio: ElevenLabs sound effects (or Freesound fallback).
+            Workflow: <strong>Build assets</strong> → <strong>Preview local</strong> → <strong>Prepare</strong> (private YouTube test) → <strong>Go live</strong> (public).
+            Video: Pexels + Pixabay. Audio: ElevenLabs or Freesound.
           </p>
         </div>
         <Btn variant="danger" disabled={busy || !data?.liveCount} onClick={handleStopAll}>Stop all ({data?.liveCount || 0} live)</Btn>
