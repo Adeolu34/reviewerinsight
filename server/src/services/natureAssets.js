@@ -8,6 +8,7 @@ const { getTheme } = require('../config/natureThemes');
 const { generateSoundEffectFile } = require('./elevenLabs');
 const { downloadNatureVideo } = require('./stockVideo');
 const freesound = require('./freesound');
+const { getNatureAudioFilter, getNatureAudioBitrate } = require('./natureAudio');
 
 const execFileAsync = promisify(execFile);
 
@@ -164,9 +165,10 @@ async function generateNoiseAmbient(destPath, durationSec, flavor) {
 async function buildSeamlessAudioLoop(srcPath, destPath, loopSec = 30) {
   const fade = 1.5;
   const d = loopSec;
+  const af = getNatureAudioFilter();
   const filter = [
-    `[0:a]afade=t=in:st=0:d=${fade},afade=t=out:st=${d - fade}:d=${fade}[a0]`,
-    `[1:a]afade=t=in:st=0:d=${fade},afade=t=out:st=${d - fade}:d=${fade}[a1]`,
+    `[0:a]${af},afade=t=in:st=0:d=${fade},afade=t=out:st=${d - fade}:d=${fade}[a0]`,
+    `[1:a]${af},afade=t=in:st=0:d=${fade},afade=t=out:st=${d - fade}:d=${fade}[a1]`,
     `[a0][a1]acrossfade=d=${fade}:c1=tri:c2=tri[out]`,
   ].join(';');
 
@@ -209,7 +211,7 @@ async function buildPreviewMux(videoPath, audioPath, destPath) {
     '-crf', '23',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
-    '-b:a', '128k',
+    '-b:a', getNatureAudioBitrate(),
     '-movflags', '+faststart',
     '-shortest',
     destPath,
@@ -284,9 +286,37 @@ async function generateAssetsForTheme(themeId) {
   };
 }
 
+/**
+ * Render a long looped MP4 for local QA (no YouTube). Default 60 minutes.
+ */
+async function exportLongTest(videoPath, audioPath, destPath, durationSec = 3600) {
+  const resolution = process.env.NATURE_STREAM_RESOLUTION || '1920:1080';
+  await runFfmpeg([
+    '-y',
+    '-stream_loop', '-1',
+    '-i', videoPath,
+    '-stream_loop', '-1',
+    '-i', audioPath,
+    '-t', String(durationSec),
+    '-map', '0:v',
+    '-map', '1:a',
+    '-vf', `scale=${resolution}:force_original_aspect_ratio=decrease,pad=${resolution}:(ow-iw)/2:(oh-ih)/2,fps=30`,
+    '-pix_fmt', 'yuv420p',
+    '-c:v', 'libx264',
+    '-preset', process.env.NATURE_EXPORT_PRESET || 'medium',
+    '-crf', '23',
+    '-c:a', 'aac',
+    '-b:a', getNatureAudioBitrate(),
+    '-movflags', '+faststart',
+    destPath,
+  ], 'long-test-export');
+  return destPath;
+}
+
 module.exports = {
   getNatureLiveDir,
   themeDir,
   generateAssetsForTheme,
   buildPreviewMux,
+  exportLongTest,
 };

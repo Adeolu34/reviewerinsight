@@ -9,7 +9,7 @@ const natureStreamSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['idle', 'generating', 'ready', 'starting', 'preview', 'live', 'error', 'stopped'],
+    enum: ['idle', 'generating', 'ready', 'exporting', 'starting', 'preview', 'live', 'error', 'stopped'],
     default: 'idle',
     index: true,
   },
@@ -18,6 +18,8 @@ const natureStreamSchema = new mongoose.Schema({
   audioPath: { type: String },
   videoPath: { type: String },
   previewPath: { type: String },
+  testExportPath: { type: String },
+  testExportMinutes: { type: Number },
   thumbnailPath: { type: String },
   youtubeBroadcastId: { type: String },
   youtubeStreamId: { type: String },

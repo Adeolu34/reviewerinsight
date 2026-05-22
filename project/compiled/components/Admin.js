@@ -4496,6 +4496,7 @@ const NATURE_STATUS_COLORS = {
   idle: T.dim,
   generating: T.warn,
   ready: T.info,
+  exporting: T.warn,
   starting: T.warn,
   preview: T.info,
   live: T.ok,
@@ -4686,7 +4687,18 @@ const NatureYoutubeConnectionCard = () => {
     style: {
       color: T.text
     }
-  }, "different Google account"), " than book-review Videos. Sign in with your nature/ambient channel when connecting."), loading ? /*#__PURE__*/React.createElement("div", {
+  }, "different Google account"), " than book-review Videos. Sign in with your nature/ambient channel when connecting."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontFamily: T.sans,
+      color: T.warn,
+      marginBottom: 12,
+      lineHeight: 1.5,
+      padding: 10,
+      borderRadius: 6,
+      background: `${T.warn}15`
+    }
+  }, "YouTube must ", /*#__PURE__*/React.createElement("strong", null, "approve live streaming"), " on this channel first (Studio \u2192 Create \u2192 Go live once, verify phone, up to 24h). Until then use ", /*#__PURE__*/React.createElement("strong", null, "Export 1h test"), " on each theme card to review the full loop locally \u2014 no YouTube needed."), loading ? /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: T.mono,
       fontSize: 12,
@@ -4837,7 +4849,7 @@ const NatureStreamCard = ({
     }
   }, /*#__PURE__*/React.createElement(Btn, {
     small: true,
-    disabled: busy || st === 'live' || st === 'generating' || st === 'preview' || st === 'starting',
+    disabled: busy || st === 'live' || st === 'generating' || st === 'exporting' || st === 'preview' || st === 'starting',
     onClick: () => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Building assets…')
   }, "1. Build assets"), /*#__PURE__*/React.createElement(Btn, {
     small: true,
@@ -4845,7 +4857,16 @@ const NatureStreamCard = ({
     disabled: busy || !stream.hasAssets,
     onClick: () => setShowPreview(true),
     title: stream.hasAssets ? 'Play 20s sample' : 'Build assets first'
-  }, "2. Preview local"), /*#__PURE__*/React.createElement(Btn, {
+  }, "2. Preview"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    disabled: busy || !stream.hasAssets || st === 'exporting',
+    onClick: () => act(() => AdminClient.exportNatureTest(stream.themeId, 60), 'Export started (~5–15 min)')
+  }, "Export 1h test"), stream.testExportReady && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => window.open(AdminClient.natureExportTestDownloadUrl(stream.themeId), '_blank')
+  }, "Download ", stream.testExportMinutes || 60, "m \u2197"), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "primary",
     disabled: busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating',
@@ -4891,7 +4912,7 @@ const NatureLiveSection = () => {
     refresh
   } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
   React.useEffect(() => {
-    const hasGenerating = data?.streams?.some(s => ['generating', 'starting', 'preview'].includes(s.status));
+    const hasGenerating = data?.streams?.some(s => ['generating', 'exporting', 'starting', 'preview'].includes(s.status));
     if (!hasGenerating) return undefined;
     const t = setInterval(() => setPoll(p => p + 1), 5000);
     return () => clearInterval(t);

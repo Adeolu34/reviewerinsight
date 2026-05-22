@@ -46,7 +46,7 @@ async function startServer() {
 
   const NatureStream = require('./models/NatureStream');
   const stuckNature = await NatureStream.updateMany(
-    { status: { $in: ['starting', 'generating'] } },
+    { status: { $in: ['starting', 'generating', 'exporting'] } },
     { $set: { status: 'error', lastError: 'Server restarted mid-operation', ffmpegPid: null } },
   );
   if (stuckNature.modifiedCount > 0) {

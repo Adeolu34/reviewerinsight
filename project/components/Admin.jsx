@@ -2102,7 +2102,7 @@ const VideosSection = () => {
 
 // ─── SECTION: Nature Live ────────────────────────────────────────
 const NATURE_STATUS_COLORS = {
-  idle: T.dim, generating: T.warn, ready: T.info, starting: T.warn, preview: T.info, live: T.ok, error: T.err, stopped: T.muted,
+  idle: T.dim, generating: T.warn, ready: T.info, exporting: T.warn, starting: T.warn, preview: T.info, live: T.ok, error: T.err, stopped: T.muted,
 };
 
 /** Always show these cards even if /nature-live/status omits themes (cached deploy, API error). */
@@ -2219,6 +2219,10 @@ const NatureYoutubeConnectionCard = () => {
       <div style={{ fontSize: 12, fontFamily: T.sans, color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>
         Use a <strong style={{ color: T.text }}>different Google account</strong> than book-review Videos. Sign in with your nature/ambient channel when connecting.
       </div>
+      <div style={{ fontSize: 11, fontFamily: T.sans, color: T.warn, marginBottom: 12, lineHeight: 1.5, padding: 10, borderRadius: 6, background: `${T.warn}15` }}>
+        YouTube must <strong>approve live streaming</strong> on this channel first (Studio → Create → Go live once, verify phone, up to 24h).
+        Until then use <strong>Export 1h test</strong> on each theme card to review the full loop locally — no YouTube needed.
+      </div>
       {loading ? (
         <div style={{ fontFamily: T.mono, fontSize: 12, color: T.muted }}>Checking…</div>
       ) : !status?.clientConfigured ? (
@@ -2291,12 +2295,20 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
         <div style={{ fontSize: 10, fontFamily: T.mono, color: T.dim, marginBottom: 8 }}>YouTube: {stream.youtubeLifeCycle}</div>
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <Btn small disabled={busy || st === 'live' || st === 'generating' || st === 'preview' || st === 'starting'} onClick={() => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Building assets…')}>
+        <Btn small disabled={busy || st === 'live' || st === 'generating' || st === 'exporting' || st === 'preview' || st === 'starting'} onClick={() => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Building assets…')}>
           1. Build assets
         </Btn>
         <Btn small variant="ghost" disabled={busy || !stream.hasAssets} onClick={() => setShowPreview(true)} title={stream.hasAssets ? 'Play 20s sample' : 'Build assets first'}>
-          2. Preview local
+          2. Preview
         </Btn>
+        <Btn small variant="ghost" disabled={busy || !stream.hasAssets || st === 'exporting'} onClick={() => act(() => AdminClient.exportNatureTest(stream.themeId, 60), 'Export started (~5–15 min)')}>
+          Export 1h test
+        </Btn>
+        {stream.testExportReady && (
+          <Btn small variant="ghost" onClick={() => window.open(AdminClient.natureExportTestDownloadUrl(stream.themeId), '_blank')}>
+            Download {stream.testExportMinutes || 60}m ↗
+          </Btn>
+        )}
         <Btn small variant="primary" disabled={busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating'} onClick={() => act(() => AdminClient.prepareNatureStream(stream.themeId), 'Preparing YouTube preview…')}>
           3. Prepare (YT preview)
         </Btn>
@@ -2327,7 +2339,7 @@ const NatureLiveSection = () => {
   const { data, loading, error, refresh } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
 
   React.useEffect(() => {
-    const hasGenerating = data?.streams?.some((s) => ['generating', 'starting', 'preview'].includes(s.status));
+    const hasGenerating = data?.streams?.some((s) => ['generating', 'exporting', 'starting', 'preview'].includes(s.status));
     if (!hasGenerating) return undefined;
     const t = setInterval(() => setPoll((p) => p + 1), 5000);
     return () => clearInterval(t);

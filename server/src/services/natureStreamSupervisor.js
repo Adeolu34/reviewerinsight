@@ -4,6 +4,7 @@ const path = require('path');
 const NatureStream = require('../models/NatureStream');
 const { MAX_CONCURRENT_LIVE } = require('../config/natureThemes');
 const natureYoutube = require('./natureYoutube');
+const { getNatureAudioBitrate } = require('./natureAudio');
 const logger = require('../utils/logger');
 
 /** themeId -> ChildProcess */
@@ -67,7 +68,7 @@ async function startEncoder(doc, { streamStatus = 'live' } = {}) {
     '-pix_fmt', 'yuv420p',
     '-g', '60',
     '-c:a', 'aac',
-    '-b:a', '128k',
+    '-b:a', getNatureAudioBitrate(),
     '-ar', '44100',
     '-f', 'flv',
     rtmpUrl,

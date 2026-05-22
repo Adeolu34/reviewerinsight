@@ -427,6 +427,19 @@ const AdminClient = {
   getNatureBroadcastStatus(themeId) {
     return this._fetch(`/nature-live/${themeId}/broadcast-status`);
   },
+  exportNatureTest(themeId, minutes = 60) {
+    return this._fetch(`/nature-live/${themeId}/export-test`, {
+      method: 'POST',
+      body: JSON.stringify({
+        minutes
+      })
+    });
+  },
+  natureExportTestDownloadUrl(themeId) {
+    const token = this.getToken();
+    const base = `${API_BASE}/admin/nature-live/${themeId}/export-test/download`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  },
   naturePreviewUrl(themeId) {
     return `${API_BASE}/admin/nature-live/${themeId}/preview`;
   },

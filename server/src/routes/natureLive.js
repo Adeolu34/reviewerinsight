@@ -7,7 +7,7 @@ const { NATURE_THEMES } = require('../config/natureThemes');
 const natureYoutube = require('../services/natureYoutube');
 const stockVideo = require('../services/stockVideo');
 const freesound = require('../services/freesound');
-const { generateAssetsForTheme, buildPreviewMux } = require('../services/natureAssets');
+const { generateAssetsForTheme, buildPreviewMux, exportLongTest, themeDir } = require('../services/natureAssets');
 const supervisor = require('../services/natureStreamSupervisor');
 const requireAdmin = require('../middleware/requireAdmin');
 const logger = require('../utils/logger');
@@ -58,7 +58,7 @@ router.get('/youtube/callback', async (req, res) => {
 
 // Allow <video src="/api/.../preview?token=..."> (cannot send Authorization header on media elements)
 router.use((req, res, next) => {
-  if (req.method === 'GET' && /\/preview(\/|$)/.test(req.path) && req.query.token && !req.headers.authorization) {
+  if (req.method === 'GET' && /\/(preview|export-test)(\/|$)/.test(req.path) && req.query.token && !req.headers.authorization) {
     req.headers.authorization = `Bearer ${req.query.token}`;
   }
   next();
@@ -174,6 +174,8 @@ router.get('/status', async (req, res, next) => {
           videoBytes: video.bytes,
           audioBytes: audio.bytes,
           previewBytes: preview.bytes,
+          testExportReady: !!(s.testExportPath && fs.existsSync(s.testExportPath)),
+          testExportMinutes: s.testExportMinutes || null,
           youtubeLifeCycle,
         };
       })),
@@ -233,8 +235,8 @@ router.post('/:themeId/generate-assets', async (req, res, next) => {
       doc = await NatureStream.create({ themeId, title: theme.title, description: theme.description });
     }
 
-    if (['live', 'preview', 'starting'].includes(doc.status)) {
-      return res.status(400).json({ error: 'Stop stream before regenerating assets' });
+    if (['live', 'preview', 'starting', 'exporting'].includes(doc.status)) {
+      return res.status(400).json({ error: 'Stop stream / wait for export before regenerating assets' });
     }
 
     await NatureStream.findByIdAndUpdate(doc._id, { $set: { status: 'generating', lastError: null } });
@@ -306,6 +308,63 @@ router.get('/:themeId/preview/audio', async (req, res, next) => {
       return res.status(404).json({ error: 'No audio assets — click Build assets first' });
     }
     return sendMediaFile(res, doc.audioPath, 'audio/mpeg');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:themeId/export-test', async (req, res, next) => {
+  try {
+    const { themeId } = req.params;
+    if (!NATURE_THEMES.find((t) => t.id === themeId)) {
+      return res.status(400).json({ error: 'Invalid theme' });
+    }
+
+    const minutes = Math.min(Math.max(parseInt(req.body?.minutes, 10) || 60, 1), 180);
+    const doc = await NatureStream.findOne({ themeId });
+    if (!doc?.videoPath || !doc?.audioPath || !fs.existsSync(doc.videoPath) || !fs.existsSync(doc.audioPath)) {
+      return res.status(400).json({ error: 'Build assets first' });
+    }
+    if (doc.status === 'exporting') {
+      return res.status(400).json({ error: 'Export already running' });
+    }
+
+    const outPath = path.join(themeDir(themeId), `test_${minutes}min.mp4`);
+    await NatureStream.findByIdAndUpdate(doc._id, {
+      $set: { status: 'exporting', lastError: null, testExportPath: null, testExportMinutes: minutes },
+    });
+
+    res.json({ ok: true, message: `Rendering ${minutes}-minute test file (no YouTube needed). This can take several minutes.` });
+
+    const durationSec = minutes * 60;
+    exportLongTest(doc.videoPath, doc.audioPath, outPath, durationSec)
+      .then(async () => {
+        await NatureStream.findOneAndUpdate(
+          { themeId },
+          { $set: { status: 'ready', testExportPath: outPath, testExportMinutes: minutes, lastError: null } },
+        );
+        logger.info(`[NatureLive] Test export ready ${themeId} ${minutes}min`);
+      })
+      .catch(async (err) => {
+        await NatureStream.findOneAndUpdate(
+          { themeId },
+          { $set: { status: 'error', lastError: `Export: ${err.message}` } },
+        );
+        logger.error(`[NatureLive] Test export failed ${themeId}: ${err.message}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:themeId/export-test/download', async (req, res, next) => {
+  try {
+    const doc = await NatureStream.findOne({ themeId: req.params.themeId });
+    if (!doc?.testExportPath || !fs.existsSync(doc.testExportPath)) {
+      return res.status(404).json({ error: 'No test export — click Export 1h test first' });
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="nature-${doc.themeId}-test.mp4"`);
+    return sendMediaFile(res, doc.testExportPath, 'video/mp4');
   } catch (err) {
     next(err);
   }
