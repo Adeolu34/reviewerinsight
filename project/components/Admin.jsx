@@ -2114,6 +2114,13 @@ function naturePreviewFetchUrl(themeId) {
   return `${base}/admin/nature-live/${themeId}/preview`;
 }
 
+/** Direct same-origin URL for <video src> (avoids blob: blocked by CSP). */
+function naturePreviewVideoSrc(themeId) {
+  const token = AdminClient.getToken();
+  const base = naturePreviewFetchUrl(themeId);
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
+
 const NATURE_THEME_LIST = [
   { id: 'rain', label: 'Rain' },
   { id: 'thunder', label: 'Thunder' },
@@ -2125,51 +2132,15 @@ const NATURE_THEME_LIST = [
 ];
 
 const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
-  const [mediaUrl, setMediaUrl] = React.useState('');
-  const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
+  const mediaUrl = React.useMemo(() => {
+    if (!AdminClient.getToken()) return '';
+    return naturePreviewVideoSrc(themeId);
+  }, [themeId]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    let objectUrl = '';
-
-    (async () => {
-      setLoading(true);
-      setErr('');
-      setMediaUrl('');
-      try {
-        const token = AdminClient.getToken();
-        const res = await fetch(naturePreviewFetchUrl(themeId), {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          let msg = text;
-          try { msg = JSON.parse(text).error || msg; } catch (_) {}
-          throw new Error(msg || `HTTP ${res.status}`);
-        }
-        const blob = await res.blob();
-        if (blob.size < 1000) {
-          throw new Error('Preview file is empty — run Build assets again and wait for status ready');
-        }
-        objectUrl = URL.createObjectURL(blob);
-        if (!cancelled) {
-          setMediaUrl(objectUrl);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setErr(e.message || 'Preview failed');
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [themeId]);
+    if (!AdminClient.getToken()) setErr('Not logged in — refresh and sign in again');
+  }, []);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={onClose}>
@@ -2179,21 +2150,22 @@ const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
           <Btn small variant="ghost" onClick={onClose}>Close</Btn>
         </div>
         <p style={{ fontSize: 12, color: T.muted, marginTop: 0 }}>20-second sample with video and sound (same content as the live stream).</p>
-        {loading && !err && (
-          <div style={{ fontFamily: T.mono, color: T.muted, fontSize: 12 }}>Loading preview…</div>
-        )}
         {err && (
           <div style={{ color: T.err, fontFamily: T.mono, fontSize: 12, lineHeight: 1.5 }}>{err}</div>
         )}
-        {mediaUrl && !err && (
+        {mediaUrl && !err ? (
           <video
+            key={mediaUrl}
             src={mediaUrl}
             controls
             autoPlay
             playsInline
             style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: 400 }}
+            onError={() => setErr('Could not play preview — run Build assets first and wait until status is ready')}
           />
-        )}
+        ) : !err ? (
+          <div style={{ fontFamily: T.mono, color: T.muted, fontSize: 12 }}>Preparing preview URL…</div>
+        ) : null}
       </div>
     </div>
   );

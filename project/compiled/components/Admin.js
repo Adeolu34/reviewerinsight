@@ -4511,6 +4511,13 @@ function naturePreviewFetchUrl(themeId) {
   const base = typeof window !== 'undefined' && window.API_BASE ? window.API_BASE : '/api';
   return `${base}/admin/nature-live/${themeId}/preview`;
 }
+
+/** Direct same-origin URL for <video src> (avoids blob: blocked by CSP). */
+function naturePreviewVideoSrc(themeId) {
+  const token = AdminClient.getToken();
+  const base = naturePreviewFetchUrl(themeId);
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
 const NATURE_THEME_LIST = [{
   id: 'rain',
   label: 'Rain'
@@ -4538,52 +4545,14 @@ const NatureAssetPreviewModal = ({
   label,
   onClose
 }) => {
-  const [mediaUrl, setMediaUrl] = React.useState('');
-  const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
-  React.useEffect(() => {
-    let cancelled = false;
-    let objectUrl = '';
-    (async () => {
-      setLoading(true);
-      setErr('');
-      setMediaUrl('');
-      try {
-        const token = AdminClient.getToken();
-        const res = await fetch(naturePreviewFetchUrl(themeId), {
-          headers: token ? {
-            Authorization: `Bearer ${token}`
-          } : {}
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          let msg = text;
-          try {
-            msg = JSON.parse(text).error || msg;
-          } catch (_) {}
-          throw new Error(msg || `HTTP ${res.status}`);
-        }
-        const blob = await res.blob();
-        if (blob.size < 1000) {
-          throw new Error('Preview file is empty — run Build assets again and wait for status ready');
-        }
-        objectUrl = URL.createObjectURL(blob);
-        if (!cancelled) {
-          setMediaUrl(objectUrl);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setErr(e.message || 'Preview failed');
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+  const mediaUrl = React.useMemo(() => {
+    if (!AdminClient.getToken()) return '';
+    return naturePreviewVideoSrc(themeId);
   }, [themeId]);
+  React.useEffect(() => {
+    if (!AdminClient.getToken()) setErr('Not logged in — refresh and sign in again');
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'fixed',
@@ -4627,20 +4596,15 @@ const NatureAssetPreviewModal = ({
       color: T.muted,
       marginTop: 0
     }
-  }, "20-second sample with video and sound (same content as the live stream)."), loading && !err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: T.mono,
-      color: T.muted,
-      fontSize: 12
-    }
-  }, "Loading preview\u2026"), err && /*#__PURE__*/React.createElement("div", {
+  }, "20-second sample with video and sound (same content as the live stream)."), err && /*#__PURE__*/React.createElement("div", {
     style: {
       color: T.err,
       fontFamily: T.mono,
       fontSize: 12,
       lineHeight: 1.5
     }
-  }, err), mediaUrl && !err && /*#__PURE__*/React.createElement("video", {
+  }, err), mediaUrl && !err ? /*#__PURE__*/React.createElement("video", {
+    key: mediaUrl,
     src: mediaUrl,
     controls: true,
     autoPlay: true,
@@ -4650,8 +4614,15 @@ const NatureAssetPreviewModal = ({
       borderRadius: 8,
       background: '#000',
       maxHeight: 400
+    },
+    onError: () => setErr('Could not play preview — run Build assets first and wait until status is ready')
+  }) : !err ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      color: T.muted,
+      fontSize: 12
     }
-  })));
+  }, "Preparing preview URL\u2026") : null));
 };
 const NatureYoutubeConnectionCard = () => {
   const [status, setStatus] = React.useState(null);

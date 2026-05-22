@@ -56,6 +56,14 @@ router.get('/youtube/callback', async (req, res) => {
   }
 });
 
+// Allow <video src="/api/.../preview?token=..."> (cannot send Authorization header on media elements)
+router.use((req, res, next) => {
+  if (req.method === 'GET' && /\/preview(\/|$)/.test(req.path) && req.query.token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  next();
+});
+
 router.use(requireAdmin);
 
 function mediaFileStats(filePath) {

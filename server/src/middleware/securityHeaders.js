@@ -9,6 +9,7 @@ module.exports = function securityHeaders(req, res, next) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "img-src 'self' data: https: http:",
+      "media-src 'self' blob:",
       "connect-src 'self' https://unpkg.com https://openlibrary.org https://www.googleapis.com https://books.google.com",
     ].join('; ')
   );
