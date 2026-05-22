@@ -2309,7 +2309,7 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
 const NatureLiveSection = () => {
   const [busy, setBusy] = React.useState(false);
   const [poll, setPoll] = React.useState(0);
-  const { resolved: data, loading, refresh } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
+  const { data, loading, error, refresh } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
 
   React.useEffect(() => {
     const hasGenerating = data?.streams?.some((s) => ['generating', 'starting', 'preview'].includes(s.status));
@@ -2354,8 +2354,16 @@ const NatureLiveSection = () => {
 
       <NatureYoutubeConnectionCard />
 
+      {error && (
+        <div style={{ padding: 12, borderRadius: 8, background: `${T.err}20`, color: T.err, fontFamily: T.mono, fontSize: 12 }}>
+          Failed to load streams: {error.message}
+        </div>
+      )}
+
       {loading && !data ? (
-        <div style={{ fontFamily: T.mono, color: T.muted }}>Loading…</div>
+        <div style={{ fontFamily: T.mono, color: T.muted }}>Loading themes…</div>
+      ) : themes.length === 0 ? (
+        <div style={{ fontFamily: T.mono, color: T.warn, fontSize: 12 }}>No themes returned — redeploy the server or refresh.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {themes.map((theme) => (

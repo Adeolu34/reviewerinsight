@@ -4862,8 +4862,9 @@ const NatureLiveSection = () => {
   const [busy, setBusy] = React.useState(false);
   const [poll, setPoll] = React.useState(0);
   const {
-    resolved: data,
+    data,
     loading,
+    error,
     refresh
   } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
   React.useEffect(() => {
@@ -4937,12 +4938,27 @@ const NatureLiveSection = () => {
   }), /*#__PURE__*/React.createElement(Metric, {
     label: "Freesound",
     value: data?.freesoundConfigured ? 'OK' : 'Fallback'
-  })), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null), loading && !data ? /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 12,
+      borderRadius: 8,
+      background: `${T.err}20`,
+      color: T.err,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, "Failed to load streams: ", error.message), loading && !data ? /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: T.mono,
       color: T.muted
     }
-  }, "Loading\u2026") : /*#__PURE__*/React.createElement("div", {
+  }, "Loading themes\u2026") : themes.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      color: T.warn,
+      fontSize: 12
+    }
+  }, "No themes returned \u2014 redeploy the server or refresh.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
