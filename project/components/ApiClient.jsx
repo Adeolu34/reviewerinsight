@@ -273,6 +273,15 @@ const AdminClient = {
   getYoutubeAuthUrl() { return this._fetch('/youtube/auth-url'); },
   disconnectYoutube() { return this._fetch('/youtube/disconnect', { method: 'DELETE' }); },
 
+  // Nature Live (separate YouTube channel)
+  getNatureLiveStatus() { return this._fetch('/nature-live/status'); },
+  getNatureYoutubeAuthUrl() { return this._fetch('/nature-live/youtube/auth-url'); },
+  disconnectNatureYoutube() { return this._fetch('/nature-live/youtube/disconnect', { method: 'DELETE' }); },
+  generateNatureAssets(themeId) { return this._fetch(`/nature-live/${themeId}/generate-assets`, { method: 'POST' }); },
+  startNatureStream(themeId) { return this._fetch(`/nature-live/${themeId}/start`, { method: 'POST' }); },
+  stopNatureStream(themeId) { return this._fetch(`/nature-live/${themeId}/stop`, { method: 'POST' }); },
+  stopAllNatureStreams() { return this._fetch('/nature-live/stop-all', { method: 'POST' }); },
+
   // Videos
   getVideoStats()                    { return this._fetch('/video-stats'); },
   getVideos(params = {})             { return this._fetch(`/videos?${new URLSearchParams(params)}`); },

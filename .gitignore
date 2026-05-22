@@ -6,3 +6,5 @@ server/node_modules/
 .claude/
 nul
 server/server.log
+nature-live/
+server/nature-live/

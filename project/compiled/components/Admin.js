@@ -4490,6 +4490,331 @@ const VideosSection = () => {
     onChange: setPage
   })));
 };
+
+// ─── SECTION: Nature Live ────────────────────────────────────────
+const NATURE_STATUS_COLORS = {
+  idle: T.dim,
+  generating: T.warn,
+  ready: T.info,
+  starting: T.warn,
+  live: T.ok,
+  error: T.err,
+  stopped: T.muted
+};
+const NatureYoutubeConnectionCard = () => {
+  const [status, setStatus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState('');
+  const loadStatus = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await AdminClient.getNatureLiveStatus();
+      setStatus(data.youtube);
+    } catch (e) {
+      setStatus(null);
+    }
+    setLoading(false);
+  }, []);
+  React.useEffect(() => {
+    loadStatus();
+    const handler = e => {
+      if (e.data === 'nature-youtube-connected') {
+        setMsg('');
+        loadStatus();
+      } else if (typeof e.data === 'string' && e.data.startsWith('nature-youtube-error:')) {
+        setMsg('✗ ' + e.data.slice('nature-youtube-error:'.length));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+  const handleConnect = async () => {
+    setMsg('');
+    try {
+      const {
+        authUrl
+      } = await AdminClient.getNatureYoutubeAuthUrl();
+      window.open(authUrl, 'nature-youtube-auth', 'width=560,height=680,resizable=yes');
+    } catch (e) {
+      setMsg('✗ ' + e.message);
+    }
+  };
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Nature YouTube channel?')) return;
+    try {
+      await AdminClient.disconnectNatureYoutube();
+      setMsg('Disconnected.');
+      loadStatus();
+    } catch (e) {
+      setMsg('✗ ' + e.message);
+    }
+  };
+  return /*#__PURE__*/React.createElement(Card, {
+    title: "Nature YouTube (separate channel)"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontFamily: T.sans,
+      color: T.muted,
+      marginBottom: 12,
+      lineHeight: 1.5
+    }
+  }, "Use a ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "different Google account"), " than book-review Videos. Sign in with your nature/ambient channel when connecting."), loading ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 12,
+      color: T.muted
+    }
+  }, "Checking\u2026") : !status?.clientConfigured ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: T.warn
+    }
+  }, "Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in environment.") : status?.connected ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 13,
+      color: T.ok
+    }
+  }, "\u2713 ", status.channelName || 'Connected'), status.channelId && /*#__PURE__*/React.createElement("a", {
+    href: `https://youtube.com/channel/${status.channelId}`,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      fontSize: 11,
+      color: T.dim
+    }
+  }, "channel \u2197"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "danger",
+    onClick: handleDisconnect
+  }, "Disconnect")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: T.muted,
+      marginBottom: 8,
+      fontFamily: T.mono
+    }
+  }, "Redirect: ", status?.redirectUri || '…'), /*#__PURE__*/React.createElement(Btn, {
+    variant: "primary",
+    onClick: handleConnect
+  }, "Connect Nature Channel")), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: msg.startsWith('✗') ? T.err : T.ok
+    }
+  }, msg));
+};
+const NatureStreamCard = ({
+  stream,
+  theme,
+  onRefresh,
+  busy,
+  setBusy
+}) => {
+  const [localMsg, setLocalMsg] = React.useState('');
+  const st = stream?.status || 'idle';
+  const color = NATURE_STATUS_COLORS[st] || T.dim;
+  const act = async (fn, label) => {
+    setBusy(true);
+    setLocalMsg('');
+    try {
+      await fn();
+      setLocalMsg(`✓ ${label}`);
+      onRefresh();
+    } catch (e) {
+      setLocalMsg('✗ ' + e.message);
+    }
+    setBusy(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: `1px solid ${T.border}`,
+      borderRadius: 8,
+      padding: 16,
+      background: T.card
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'start',
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.serif,
+      fontSize: 20,
+      fontWeight: 700
+    }
+  }, theme?.label || stream.themeId), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 10,
+      color: color,
+      textTransform: 'uppercase',
+      letterSpacing: '.1em',
+      marginTop: 4
+    }
+  }, st)), stream.thumbnailPath && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontFamily: T.mono,
+      color: T.dim
+    }
+  }, "thumb \u2713")), stream.lastError && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontFamily: T.mono,
+      color: T.err,
+      marginBottom: 8,
+      wordBreak: 'break-word'
+    }
+  }, stream.lastError), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    disabled: busy || st === 'live' || st === 'generating',
+    onClick: () => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Assets queued')
+  }, "Regenerate"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    disabled: busy || st === 'live' || st === 'generating' || !stream.hasAssets,
+    onClick: () => act(() => AdminClient.startNatureStream(stream.themeId), 'Starting')
+  }, "Start"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "danger",
+    disabled: busy || st !== 'live' && st !== 'starting',
+    onClick: () => act(() => AdminClient.stopNatureStream(stream.themeId), 'Stopped')
+  }, "Stop"), stream.youtubeWatchUrl && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => window.open(stream.youtubeWatchUrl, '_blank')
+  }, "YouTube \u2197")), localMsg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 11,
+      fontFamily: T.mono,
+      color: localMsg.startsWith('✗') ? T.err : T.ok
+    }
+  }, localMsg));
+};
+const NatureLiveSection = () => {
+  const [busy, setBusy] = React.useState(false);
+  const [poll, setPoll] = React.useState(0);
+  const {
+    resolved: data,
+    loading,
+    refresh
+  } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
+  React.useEffect(() => {
+    const hasGenerating = data?.streams?.some(s => s.status === 'generating' || s.status === 'starting');
+    if (!hasGenerating) return undefined;
+    const t = setInterval(() => setPoll(p => p + 1), 5000);
+    return () => clearInterval(t);
+  }, [data]);
+  const streams = data?.streams || [];
+  const themes = data?.themes || [];
+  const streamByTheme = Object.fromEntries(streams.map(s => [s.themeId, s]));
+  const handleStopAll = async () => {
+    if (!confirm('Stop all nature live streams?')) return;
+    setBusy(true);
+    try {
+      await AdminClient.stopAllNatureStreams();
+      refresh();
+    } catch (e) {
+      alert(e.message);
+    }
+    setBusy(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontFamily: T.serif,
+      fontSize: 32,
+      margin: 0
+    }
+  }, "Nature Live"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 13,
+      color: T.muted,
+      marginTop: 8,
+      maxWidth: 640,
+      lineHeight: 1.6
+    }
+  }, "Up to ", data?.maxConcurrent || 7, " concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your ", /*#__PURE__*/React.createElement("strong", null, "nature"), " YouTube channel. Licensed stock (Pexels) + CC0 audio (Freesound) recommended.")), /*#__PURE__*/React.createElement(Btn, {
+    variant: "danger",
+    disabled: busy || !data?.liveCount,
+    onClick: handleStopAll
+  }, "Stop all (", data?.liveCount || 0, " live)")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 16,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement(Metric, {
+    label: "Live now",
+    value: data?.liveCount ?? '—'
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Pexels API",
+    value: data?.pexelsConfigured ? 'OK' : 'Missing'
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Freesound",
+    value: data?.freesoundConfigured ? 'OK' : 'Noise fallback'
+  })), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null), loading && !data ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      color: T.muted
+    }
+  }, "Loading\u2026") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+      gap: 16
+    }
+  }, themes.map(theme => /*#__PURE__*/React.createElement(NatureStreamCard, {
+    key: theme.id,
+    theme: theme,
+    stream: streamByTheme[theme.id] || {
+      themeId: theme.id,
+      status: 'idle'
+    },
+    onRefresh: refresh,
+    busy: busy,
+    setBusy: setBusy
+  }))));
+};
 const SECTIONS = [{
   id: 'overview',
   label: 'Overview',
@@ -4510,6 +4835,10 @@ const SECTIONS = [{
   id: 'videos',
   label: 'Videos',
   icon: '▷'
+}, {
+  id: 'nature-live',
+  label: 'Nature Live',
+  icon: '◎'
 }, {
   id: 'scraper',
   label: 'Scraper',
@@ -4554,6 +4883,7 @@ const Admin = ({
     books: BooksSection,
     authors: AuthorsSection,
     videos: VideosSection,
+    'nature-live': NatureLiveSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,

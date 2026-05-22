@@ -23,6 +23,7 @@ const sitemapRouter = require('./routes/sitemap');
 const feedRouter = require('./routes/feed');
 const bookCanonicalRouter = require('./routes/bookCanonical');
 const authorsRouter = require('./routes/authors');
+const natureLiveRouter = require('./routes/natureLive');
 const seoMiddleware = require('./middleware/seoMiddleware');
 
 async function startServer() {
@@ -41,6 +42,15 @@ async function startServer() {
   );
   if (stuck.modifiedCount > 0) {
     logger.warn(`[startup] Reset ${stuck.modifiedCount} stuck video job(s) to failed`);
+  }
+
+  const NatureStream = require('./models/NatureStream');
+  const stuckNature = await NatureStream.updateMany(
+    { status: { $in: ['starting', 'generating'] } },
+    { $set: { status: 'error', lastError: 'Server restarted mid-operation', ffmpegPid: null } },
+  );
+  if (stuckNature.modifiedCount > 0) {
+    logger.warn(`[startup] Reset ${stuckNature.modifiedCount} stuck nature stream(s)`);
   }
 
   const app = express();
@@ -67,6 +77,7 @@ async function startServer() {
   app.use('/api/search', searchRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/admin/nature-live', natureLiveRouter);
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
   app.use('/api/authors', authorsRouter);
@@ -205,6 +216,12 @@ async function startServer() {
   cron.schedule('0 15 * * *', runScheduledVideo, { timezone: 'UTC' });
   cron.schedule('0 21 * * *', runScheduledVideo, { timezone: 'UTC' });
   logger.info('VideoAgent schedule: daily at 3:00 AM, 9:00 AM, 3:00 PM and 9:00 PM UTC');
+
+  const natureSupervisor = require('./services/natureStreamSupervisor');
+  natureSupervisor.startWatchdogCron();
+  natureSupervisor.resumeLiveOnStartup().catch((err) => {
+    logger.error(`[NatureStream] Startup resume failed: ${err.message}`);
+  });
 
   app.listen(config.port, () => {
     logger.info(`Reviewer Insight server running on http://localhost:${config.port}`);

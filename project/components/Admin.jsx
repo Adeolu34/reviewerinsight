@@ -2100,12 +2100,209 @@ const VideosSection = () => {
   );
 };
 
+// ─── SECTION: Nature Live ────────────────────────────────────────
+const NATURE_STATUS_COLORS = {
+  idle: T.dim, generating: T.warn, ready: T.info, starting: T.warn, live: T.ok, error: T.err, stopped: T.muted,
+};
+
+const NatureYoutubeConnectionCard = () => {
+  const [status, setStatus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState('');
+
+  const loadStatus = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await AdminClient.getNatureLiveStatus();
+      setStatus(data.youtube);
+    } catch (e) { setStatus(null); }
+    setLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    loadStatus();
+    const handler = (e) => {
+      if (e.data === 'nature-youtube-connected') { setMsg(''); loadStatus(); }
+      else if (typeof e.data === 'string' && e.data.startsWith('nature-youtube-error:')) {
+        setMsg('✗ ' + e.data.slice('nature-youtube-error:'.length));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const handleConnect = async () => {
+    setMsg('');
+    try {
+      const { authUrl } = await AdminClient.getNatureYoutubeAuthUrl();
+      window.open(authUrl, 'nature-youtube-auth', 'width=560,height=680,resizable=yes');
+    } catch (e) { setMsg('✗ ' + e.message); }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Nature YouTube channel?')) return;
+    try {
+      await AdminClient.disconnectNatureYoutube();
+      setMsg('Disconnected.');
+      loadStatus();
+    } catch (e) { setMsg('✗ ' + e.message); }
+  };
+
+  return (
+    <Card title="Nature YouTube (separate channel)">
+      <div style={{ fontSize: 12, fontFamily: T.sans, color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>
+        Use a <strong style={{ color: T.text }}>different Google account</strong> than book-review Videos. Sign in with your nature/ambient channel when connecting.
+      </div>
+      {loading ? (
+        <div style={{ fontFamily: T.mono, fontSize: 12, color: T.muted }}>Checking…</div>
+      ) : !status?.clientConfigured ? (
+        <div style={{ fontSize: 13, color: T.warn }}>Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in environment.</div>
+      ) : status?.connected ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: T.mono, fontSize: 13, color: T.ok }}>✓ {status.channelName || 'Connected'}</span>
+          {status.channelId && (
+            <a href={`https://youtube.com/channel/${status.channelId}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: T.dim }}>channel ↗</a>
+          )}
+          <Btn small variant="danger" onClick={handleDisconnect}>Disconnect</Btn>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 8, fontFamily: T.mono }}>
+            Redirect: {status?.redirectUri || '…'}
+          </div>
+          <Btn variant="primary" onClick={handleConnect}>Connect Nature Channel</Btn>
+        </div>
+      )}
+      {msg && <div style={{ marginTop: 8, fontSize: 12, fontFamily: T.mono, color: msg.startsWith('✗') ? T.err : T.ok }}>{msg}</div>}
+    </Card>
+  );
+};
+
+const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
+  const [localMsg, setLocalMsg] = React.useState('');
+  const st = stream?.status || 'idle';
+  const color = NATURE_STATUS_COLORS[st] || T.dim;
+
+  const act = async (fn, label) => {
+    setBusy(true);
+    setLocalMsg('');
+    try {
+      await fn();
+      setLocalMsg(`✓ ${label}`);
+      onRefresh();
+    } catch (e) {
+      setLocalMsg('✗ ' + e.message);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, background: T.card }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 10 }}>
+        <div>
+          <div style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 700 }}>{theme?.label || stream.themeId}</div>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: color, textTransform: 'uppercase', letterSpacing: '.1em', marginTop: 4 }}>{st}</div>
+        </div>
+        {stream.thumbnailPath && (
+          <span style={{ fontSize: 10, fontFamily: T.mono, color: T.dim }}>thumb ✓</span>
+        )}
+      </div>
+      {stream.lastError && (
+        <div style={{ fontSize: 11, fontFamily: T.mono, color: T.err, marginBottom: 8, wordBreak: 'break-word' }}>{stream.lastError}</div>
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <Btn small disabled={busy || st === 'live' || st === 'generating'} onClick={() => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Assets queued')}>
+          Regenerate
+        </Btn>
+        <Btn small variant="primary" disabled={busy || st === 'live' || st === 'generating' || !stream.hasAssets} onClick={() => act(() => AdminClient.startNatureStream(stream.themeId), 'Starting')}>
+          Start
+        </Btn>
+        <Btn small variant="danger" disabled={busy || (st !== 'live' && st !== 'starting')} onClick={() => act(() => AdminClient.stopNatureStream(stream.themeId), 'Stopped')}>
+          Stop
+        </Btn>
+        {stream.youtubeWatchUrl && (
+          <Btn small variant="ghost" onClick={() => window.open(stream.youtubeWatchUrl, '_blank')}>YouTube ↗</Btn>
+        )}
+      </div>
+      {localMsg && <div style={{ marginTop: 8, fontSize: 11, fontFamily: T.mono, color: localMsg.startsWith('✗') ? T.err : T.ok }}>{localMsg}</div>}
+    </div>
+  );
+};
+
+const NatureLiveSection = () => {
+  const [busy, setBusy] = React.useState(false);
+  const [poll, setPoll] = React.useState(0);
+  const { resolved: data, loading, refresh } = useAdminApi(() => AdminClient.getNatureLiveStatus(), [poll]);
+
+  React.useEffect(() => {
+    const hasGenerating = data?.streams?.some((s) => s.status === 'generating' || s.status === 'starting');
+    if (!hasGenerating) return undefined;
+    const t = setInterval(() => setPoll((p) => p + 1), 5000);
+    return () => clearInterval(t);
+  }, [data]);
+
+  const streams = data?.streams || [];
+  const themes = data?.themes || [];
+  const streamByTheme = Object.fromEntries(streams.map((s) => [s.themeId, s]));
+
+  const handleStopAll = async () => {
+    if (!confirm('Stop all nature live streams?')) return;
+    setBusy(true);
+    try {
+      await AdminClient.stopAllNatureStreams();
+      refresh();
+    } catch (e) { alert(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontFamily: T.serif, fontSize: 32, margin: 0 }}>Nature Live</h1>
+          <p style={{ fontFamily: T.sans, fontSize: 13, color: T.muted, marginTop: 8, maxWidth: 640, lineHeight: 1.6 }}>
+            Up to {data?.maxConcurrent || 7} concurrent 24/7 ambient streams. Generate looping video + audio, then push RTMP to your <strong>nature</strong> YouTube channel.
+            Licensed stock (Pexels) + CC0 audio (Freesound) recommended.
+          </p>
+        </div>
+        <Btn variant="danger" disabled={busy || !data?.liveCount} onClick={handleStopAll}>Stop all ({data?.liveCount || 0} live)</Btn>
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <Metric label="Live now" value={data?.liveCount ?? '—'} />
+        <Metric label="Pexels API" value={data?.pexelsConfigured ? 'OK' : 'Missing'} />
+        <Metric label="Freesound" value={data?.freesoundConfigured ? 'OK' : 'Noise fallback'} />
+      </div>
+
+      <NatureYoutubeConnectionCard />
+
+      {loading && !data ? (
+        <div style={{ fontFamily: T.mono, color: T.muted }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {themes.map((theme) => (
+            <NatureStreamCard
+              key={theme.id}
+              theme={theme}
+              stream={streamByTheme[theme.id] || { themeId: theme.id, status: 'idle' }}
+              onRefresh={refresh}
+              busy={busy}
+              setBusy={setBusy}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: '◐' },
   { id: 'runs', label: 'Agent Runs', icon: '▶' },
   { id: 'books', label: 'Books', icon: '▤' },
   { id: 'authors', label: 'Authors', icon: '✍' },
   { id: 'videos', label: 'Videos', icon: '▷' },
+  { id: 'nature-live', label: 'Nature Live', icon: '◎' },
   { id: 'scraper', label: 'Scraper', icon: '⇣' },
   { id: 'duplicates', label: 'Duplicates', icon: '⊘' },
   { id: 'competitors', label: 'Competitors', icon: '◈' },
@@ -2132,6 +2329,7 @@ const Admin = ({ setRoute }) => {
     books: BooksSection,
     authors: AuthorsSection,
     videos: VideosSection,
+    'nature-live': NatureLiveSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,
