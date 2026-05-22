@@ -4502,6 +4502,30 @@ const NATURE_STATUS_COLORS = {
   error: T.err,
   stopped: T.muted
 };
+
+/** Always show these cards even if /nature-live/status omits themes (cached deploy, API error). */
+const NATURE_THEME_LIST = [{
+  id: 'rain',
+  label: 'Rain'
+}, {
+  id: 'thunder',
+  label: 'Thunder'
+}, {
+  id: 'wind',
+  label: 'Wind'
+}, {
+  id: 'ocean',
+  label: 'Ocean'
+}, {
+  id: 'birds',
+  label: 'Birds'
+}, {
+  id: 'breeze',
+  label: 'Breeze'
+}, {
+  id: 'footsteps',
+  label: 'Footsteps'
+}];
 const NatureAssetPreviewModal = ({
   themeId,
   label,
@@ -4874,7 +4898,7 @@ const NatureLiveSection = () => {
     return () => clearInterval(t);
   }, [data]);
   const streams = data?.streams || [];
-  const themes = data?.themes || [];
+  const themes = data?.themes?.length ? data.themes : NATURE_THEME_LIST;
   const streamByTheme = Object.fromEntries(streams.map(s => [s.themeId, s]));
   const handleStopAll = async () => {
     if (!confirm('Stop all nature live streams?')) return;
@@ -4938,7 +4962,7 @@ const NatureLiveSection = () => {
   }), /*#__PURE__*/React.createElement(Metric, {
     label: "Freesound",
     value: data?.freesoundConfigured ? 'OK' : 'Fallback'
-  })), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null), error && /*#__PURE__*/React.createElement("div", {
+  })), error && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 12,
       borderRadius: 8,
@@ -4947,18 +4971,42 @@ const NatureLiveSection = () => {
       fontFamily: T.mono,
       fontSize: 12
     }
-  }, "Failed to load streams: ", error.message), loading && !data ? /*#__PURE__*/React.createElement("div", {
+  }, "Failed to load stream status: ", error.message, " \u2014 theme buttons below still work."), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontFamily: T.serif,
+      fontSize: 22,
+      margin: '0 0 4px'
+    }
+  }, "Stream themes"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 12,
+      color: T.muted,
+      margin: '0 0 12px'
+    }
+  }, "Pick a theme \u2014 each card has ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Build assets"), ", ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Preview local"), ", ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Prepare"), ", and ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Go live"), "."), loading && !data && /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: T.mono,
-      color: T.muted
+      color: T.muted,
+      marginBottom: 12
     }
-  }, "Loading themes\u2026") : themes.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: T.mono,
-      color: T.warn,
-      fontSize: 12
-    }
-  }, "No themes returned \u2014 redeploy the server or refresh.") : /*#__PURE__*/React.createElement("div", {
+  }, "Loading status\u2026"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -4974,7 +5022,7 @@ const NatureLiveSection = () => {
     onRefresh: refresh,
     busy: busy,
     setBusy: setBusy
-  }))));
+  })))), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null));
 };
 const SECTIONS = [{
   id: 'overview',

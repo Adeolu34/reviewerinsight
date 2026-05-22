@@ -2105,6 +2105,17 @@ const NATURE_STATUS_COLORS = {
   idle: T.dim, generating: T.warn, ready: T.info, starting: T.warn, preview: T.info, live: T.ok, error: T.err, stopped: T.muted,
 };
 
+/** Always show these cards even if /nature-live/status omits themes (cached deploy, API error). */
+const NATURE_THEME_LIST = [
+  { id: 'rain', label: 'Rain' },
+  { id: 'thunder', label: 'Thunder' },
+  { id: 'wind', label: 'Wind' },
+  { id: 'ocean', label: 'Ocean' },
+  { id: 'birds', label: 'Birds' },
+  { id: 'breeze', label: 'Breeze' },
+  { id: 'footsteps', label: 'Footsteps' },
+];
+
 const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
   const [videoUrl, setVideoUrl] = React.useState('');
   const [audioUrl, setAudioUrl] = React.useState('');
@@ -2319,7 +2330,7 @@ const NatureLiveSection = () => {
   }, [data]);
 
   const streams = data?.streams || [];
-  const themes = data?.themes || [];
+  const themes = (data?.themes?.length ? data.themes : NATURE_THEME_LIST);
   const streamByTheme = Object.fromEntries(streams.map((s) => [s.themeId, s]));
 
   const handleStopAll = async () => {
@@ -2352,19 +2363,20 @@ const NatureLiveSection = () => {
         <Metric label="Freesound" value={data?.freesoundConfigured ? 'OK' : 'Fallback'} />
       </div>
 
-      <NatureYoutubeConnectionCard />
-
       {error && (
         <div style={{ padding: 12, borderRadius: 8, background: `${T.err}20`, color: T.err, fontFamily: T.mono, fontSize: 12 }}>
-          Failed to load streams: {error.message}
+          Failed to load stream status: {error.message} — theme buttons below still work.
         </div>
       )}
 
-      {loading && !data ? (
-        <div style={{ fontFamily: T.mono, color: T.muted }}>Loading themes…</div>
-      ) : themes.length === 0 ? (
-        <div style={{ fontFamily: T.mono, color: T.warn, fontSize: 12 }}>No themes returned — redeploy the server or refresh.</div>
-      ) : (
+      <div>
+        <h2 style={{ fontFamily: T.serif, fontSize: 22, margin: '0 0 4px' }}>Stream themes</h2>
+        <p style={{ fontFamily: T.sans, fontSize: 12, color: T.muted, margin: '0 0 12px' }}>
+          Pick a theme — each card has <strong style={{ color: T.text }}>Build assets</strong>, <strong style={{ color: T.text }}>Preview local</strong>, <strong style={{ color: T.text }}>Prepare</strong>, and <strong style={{ color: T.text }}>Go live</strong>.
+        </p>
+        {loading && !data && (
+          <div style={{ fontFamily: T.mono, color: T.muted, marginBottom: 12 }}>Loading status…</div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {themes.map((theme) => (
             <NatureStreamCard
@@ -2377,7 +2389,9 @@ const NatureLiveSection = () => {
             />
           ))}
         </div>
-      )}
+      </div>
+
+      <NatureYoutubeConnectionCard />
     </div>
   );
 };
