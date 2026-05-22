@@ -1,5 +1,8 @@
 const { google } = require('googleapis');
+const config = require('../config/env');
 const logger = require('../utils/logger');
+
+const NATURE_CALLBACK_PATH = '/api/admin/nature-live/youtube/callback';
 
 const REFRESH_TOKEN_KEY = 'nature_youtube_refresh_token';
 
@@ -16,9 +19,24 @@ async function _getRefreshToken() {
 }
 
 function getRedirectUri(req) {
-  if (process.env.NATURE_YOUTUBE_REDIRECT_URI) return process.env.NATURE_YOUTUBE_REDIRECT_URI;
-  if (req) return `${req.protocol}://${req.get('host')}/api/admin/nature-live/youtube/callback`;
-  return process.env.NATURE_YOUTUBE_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
+  const explicit = process.env.NATURE_YOUTUBE_REDIRECT_URI?.trim();
+  if (explicit) return explicit;
+
+  const bookUri = process.env.YOUTUBE_REDIRECT_URI?.trim();
+  if (bookUri?.includes('/api/admin/youtube/callback')) {
+    return bookUri.replace('/api/admin/youtube/callback', NATURE_CALLBACK_PATH);
+  }
+
+  if (config.siteUrl) {
+    return `${config.siteUrl}${NATURE_CALLBACK_PATH}`;
+  }
+
+  if (req) {
+    const proto = (req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
+    return `${proto}://${req.get('host')}${NATURE_CALLBACK_PATH}`;
+  }
+
+  return 'urn:ietf:wg:oauth:2.0:oob';
 }
 
 function createOAuth2Client(redirectUri) {
@@ -37,8 +55,7 @@ async function isConfigured() {
 async function getClient() {
   const token = await _getRefreshToken();
   if (!token) throw new Error('Nature YouTube refresh token not configured');
-  const redirectUri = process.env.NATURE_YOUTUBE_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
-  const auth = createOAuth2Client(redirectUri);
+  const auth = createOAuth2Client(getRedirectUri());
   auth.setCredentials({ refresh_token: token });
   return auth;
 }

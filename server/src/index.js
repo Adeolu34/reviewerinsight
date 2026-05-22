@@ -55,6 +55,11 @@ async function startServer() {
 
   const app = express();
 
+  // Behind Coolify/nginx — req.protocol and X-Forwarded-* for OAuth redirect URIs
+  if (config.nodeEnv === 'production') {
+    app.set('trust proxy', 1);
+  }
+
   // Middleware
   app.use(corsMiddleware);
   app.use(securityHeaders);
