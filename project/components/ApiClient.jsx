@@ -281,6 +281,7 @@ const AdminClient = {
   prepareNatureStream(themeId) { return this._fetch(`/nature-live/${themeId}/prepare`, { method: 'POST' }); },
   goLiveNatureStream(themeId) { return this._fetch(`/nature-live/${themeId}/go-live`, { method: 'POST' }); },
   getNatureBroadcastStatus(themeId) { return this._fetch(`/nature-live/${themeId}/broadcast-status`); },
+  naturePreviewUrl(themeId) { return `${API_BASE}/admin/nature-live/${themeId}/preview`; },
   naturePreviewVideoUrl(themeId) { return `${API_BASE}/admin/nature-live/${themeId}/preview/video`; },
   naturePreviewAudioUrl(themeId) { return `${API_BASE}/admin/nature-live/${themeId}/preview/audio`; },
   startNatureStream(themeId) { return this._fetch(`/nature-live/${themeId}/start`, { method: 'POST' }); },

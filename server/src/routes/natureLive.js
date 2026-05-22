@@ -7,7 +7,7 @@ const { NATURE_THEMES } = require('../config/natureThemes');
 const natureYoutube = require('../services/natureYoutube');
 const stockVideo = require('../services/stockVideo');
 const freesound = require('../services/freesound');
-const { generateAssetsForTheme } = require('../services/natureAssets');
+const { generateAssetsForTheme, buildPreviewMux } = require('../services/natureAssets');
 const supervisor = require('../services/natureStreamSupervisor');
 const requireAdmin = require('../middleware/requireAdmin');
 const logger = require('../utils/logger');
@@ -57,6 +57,39 @@ router.get('/youtube/callback', async (req, res) => {
 });
 
 router.use(requireAdmin);
+
+function mediaFileStats(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return { exists: false, bytes: 0 };
+  const st = fs.statSync(filePath);
+  return { exists: true, bytes: st.size };
+}
+
+async function resolvePreviewPath(doc) {
+  if (doc.previewPath && fs.existsSync(doc.previewPath)) {
+    const st = fs.statSync(doc.previewPath);
+    if (st.size > 1000) return doc.previewPath;
+  }
+  if (!doc.videoPath || !doc.audioPath || !fs.existsSync(doc.videoPath) || !fs.existsSync(doc.audioPath)) {
+    return null;
+  }
+  const dir = path.dirname(doc.videoPath);
+  const previewPath = path.join(dir, 'preview.mp4');
+  await buildPreviewMux(doc.videoPath, doc.audioPath, previewPath);
+  await NatureStream.findByIdAndUpdate(doc._id, { $set: { previewPath } });
+  return previewPath;
+}
+
+function sendMediaFile(res, filePath, contentType) {
+  const st = fs.statSync(filePath);
+  if (st.size < 500) {
+    return res.status(404).json({ error: 'Media file is empty — run Build assets again' });
+  }
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Length', String(st.size));
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.resolve(filePath));
+}
 
 async function ensureStreamDocs() {
   for (const theme of NATURE_THEMES) {
@@ -123,9 +156,16 @@ router.get('/status', async (req, res, next) => {
             youtubeLifeCycle = b?.status?.lifeCycleStatus || null;
           } catch (_) {}
         }
+        const video = mediaFileStats(s.videoPath);
+        const audio = mediaFileStats(s.audioPath);
+        const preview = mediaFileStats(s.previewPath);
         return {
           ...s,
-          hasAssets: !!(s.audioPath && s.videoPath && fs.existsSync(s.audioPath) && fs.existsSync(s.videoPath)),
+          hasAssets: video.exists && audio.exists && video.bytes > 500 && audio.bytes > 500,
+          hasPreview: preview.exists && preview.bytes > 1000,
+          videoBytes: video.bytes,
+          audioBytes: audio.bytes,
+          previewBytes: preview.bytes,
           youtubeLifeCycle,
         };
       })),
@@ -200,6 +240,7 @@ router.post('/:themeId/generate-assets', async (req, res, next) => {
               status: 'ready',
               audioPath: assets.audioPath,
               videoPath: assets.videoPath,
+              previewPath: assets.previewPath,
               thumbnailPath: assets.thumbnailPath,
               title: assets.title,
               description: assets.description,
@@ -224,15 +265,27 @@ router.post('/:themeId/generate-assets', async (req, res, next) => {
   }
 });
 
+router.get('/:themeId/preview', async (req, res, next) => {
+  try {
+    const doc = await NatureStream.findOne({ themeId: req.params.themeId });
+    if (!doc) return res.status(404).json({ error: 'Unknown theme' });
+    const previewPath = await resolvePreviewPath(doc);
+    if (!previewPath) {
+      return res.status(404).json({ error: 'No assets — click Build assets first and wait until status is ready' });
+    }
+    return sendMediaFile(res, previewPath, 'video/mp4');
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:themeId/preview/video', async (req, res, next) => {
   try {
     const doc = await NatureStream.findOne({ themeId: req.params.themeId });
     if (!doc?.videoPath || !fs.existsSync(doc.videoPath)) {
-      return res.status(404).json({ error: 'No video assets — click Regenerate first' });
+      return res.status(404).json({ error: 'No video assets — click Build assets first' });
     }
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Accept-Ranges', 'bytes');
-    return res.sendFile(path.resolve(doc.videoPath));
+    return sendMediaFile(res, doc.videoPath, 'video/mp4');
   } catch (err) {
     next(err);
   }
@@ -242,10 +295,9 @@ router.get('/:themeId/preview/audio', async (req, res, next) => {
   try {
     const doc = await NatureStream.findOne({ themeId: req.params.themeId });
     if (!doc?.audioPath || !fs.existsSync(doc.audioPath)) {
-      return res.status(404).json({ error: 'No audio assets — click Regenerate first' });
+      return res.status(404).json({ error: 'No audio assets — click Build assets first' });
     }
-    res.setHeader('Content-Type', 'audio/mpeg');
-    return res.sendFile(path.resolve(doc.audioPath));
+    return sendMediaFile(res, doc.audioPath, 'audio/mpeg');
   } catch (err) {
     next(err);
   }

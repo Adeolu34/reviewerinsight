@@ -427,6 +427,9 @@ const AdminClient = {
   getNatureBroadcastStatus(themeId) {
     return this._fetch(`/nature-live/${themeId}/broadcast-status`);
   },
+  naturePreviewUrl(themeId) {
+    return `${API_BASE}/admin/nature-live/${themeId}/preview`;
+  },
   naturePreviewVideoUrl(themeId) {
     return `${API_BASE}/admin/nature-live/${themeId}/preview/video`;
   },

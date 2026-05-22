@@ -2117,34 +2117,49 @@ const NATURE_THEME_LIST = [
 ];
 
 const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
-  const [videoUrl, setVideoUrl] = React.useState('');
-  const [audioUrl, setAudioUrl] = React.useState('');
+  const [mediaUrl, setMediaUrl] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
 
   React.useEffect(() => {
     let cancelled = false;
-    const token = AdminClient.getToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const load = async (path, setter) => {
-      const res = await fetch(path, { headers });
-      if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
-      const blob = await res.blob();
-      if (!cancelled) setter(URL.createObjectURL(blob));
-    };
+    let objectUrl = '';
+
     (async () => {
+      setLoading(true);
+      setErr('');
+      setMediaUrl('');
       try {
-        await Promise.all([
-          load(AdminClient.naturePreviewVideoUrl(themeId), setVideoUrl),
-          load(AdminClient.naturePreviewAudioUrl(themeId), setAudioUrl),
-        ]);
+        const token = AdminClient.getToken();
+        const res = await fetch(AdminClient.naturePreviewUrl(themeId), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = text;
+          try { msg = JSON.parse(text).error || msg; } catch (_) {}
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        if (blob.size < 1000) {
+          throw new Error('Preview file is empty — run Build assets again and wait for status ready');
+        }
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setMediaUrl(objectUrl);
+          setLoading(false);
+        }
       } catch (e) {
-        if (!cancelled) setErr(e.message || 'Preview failed');
+        if (!cancelled) {
+          setErr(e.message || 'Preview failed');
+          setLoading(false);
+        }
       }
     })();
+
     return () => {
       cancelled = true;
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [themeId]);
 
@@ -2155,20 +2170,21 @@ const NatureAssetPreviewModal = ({ themeId, label, onClose }) => {
           <h3 style={{ fontFamily: T.serif, margin: 0 }}>Preview — {label}</h3>
           <Btn small variant="ghost" onClick={onClose}>Close</Btn>
         </div>
-        <p style={{ fontSize: 12, color: T.muted, marginTop: 0 }}>Local loop files before YouTube. Video is silent; audio plays separately (same as the live stream).</p>
-        {err ? (
-          <div style={{ color: T.err, fontFamily: T.mono, fontSize: 12 }}>{err}</div>
-        ) : (
-          <>
-            {videoUrl ? (
-              <video src={videoUrl} controls autoPlay loop muted playsInline style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: 320 }} />
-            ) : (
-              <div style={{ fontFamily: T.mono, color: T.muted, fontSize: 12 }}>Loading video…</div>
-            )}
-            {audioUrl && (
-              <audio src={audioUrl} controls autoPlay loop style={{ width: '100%', marginTop: 12 }} />
-            )}
-          </>
+        <p style={{ fontSize: 12, color: T.muted, marginTop: 0 }}>20-second sample with video and sound (same content as the live stream).</p>
+        {loading && !err && (
+          <div style={{ fontFamily: T.mono, color: T.muted, fontSize: 12 }}>Loading preview…</div>
+        )}
+        {err && (
+          <div style={{ color: T.err, fontFamily: T.mono, fontSize: 12, lineHeight: 1.5 }}>{err}</div>
+        )}
+        {mediaUrl && !err && (
+          <video
+            src={mediaUrl}
+            controls
+            autoPlay
+            playsInline
+            style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: 400 }}
+          />
         )}
       </div>
     </div>
@@ -2280,6 +2296,14 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
           <span style={{ fontSize: 10, fontFamily: T.mono, color: T.dim }}>thumb ✓</span>
         )}
       </div>
+      {stream.hasAssets && (stream.videoBytes || stream.audioBytes) ? (
+        <div style={{ fontSize: 10, fontFamily: T.mono, color: T.dim, marginBottom: 8 }}>
+          Assets: video {stream.videoBytes ? `${(stream.videoBytes / 1024 / 1024).toFixed(1)} MB` : '?'}
+          {' · '}audio {stream.audioBytes ? `${(stream.audioBytes / 1024 / 1024).toFixed(1)} MB` : '?'}
+        </div>
+      ) : st === 'ready' || st === 'idle' ? (
+        <div style={{ fontSize: 10, fontFamily: T.mono, color: T.warn, marginBottom: 8 }}>No files on server — click Build assets</div>
+      ) : null}
       {stream.lastError && (
         <div style={{ fontSize: 11, fontFamily: T.mono, color: T.err, marginBottom: 8, wordBreak: 'break-word' }}>{stream.lastError}</div>
       )}
@@ -2290,7 +2314,7 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
         <Btn small disabled={busy || st === 'live' || st === 'generating' || st === 'preview' || st === 'starting'} onClick={() => act(() => AdminClient.generateNatureAssets(stream.themeId), 'Building assets…')}>
           1. Build assets
         </Btn>
-        <Btn small variant="ghost" disabled={busy || !stream.hasAssets} onClick={() => setShowPreview(true)}>
+        <Btn small variant="ghost" disabled={busy || !stream.hasAssets} onClick={() => setShowPreview(true)} title={stream.hasAssets ? 'Play 20s sample' : 'Build assets first'}>
           2. Preview local
         </Btn>
         <Btn small variant="primary" disabled={busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating'} onClick={() => act(() => AdminClient.prepareNatureStream(stream.themeId), 'Preparing YouTube preview…')}>

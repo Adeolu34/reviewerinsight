@@ -4531,34 +4531,50 @@ const NatureAssetPreviewModal = ({
   label,
   onClose
 }) => {
-  const [videoUrl, setVideoUrl] = React.useState('');
-  const [audioUrl, setAudioUrl] = React.useState('');
+  const [mediaUrl, setMediaUrl] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
   React.useEffect(() => {
     let cancelled = false;
-    const token = AdminClient.getToken();
-    const headers = token ? {
-      Authorization: `Bearer ${token}`
-    } : {};
-    const load = async (path, setter) => {
-      const res = await fetch(path, {
-        headers
-      });
-      if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
-      const blob = await res.blob();
-      if (!cancelled) setter(URL.createObjectURL(blob));
-    };
+    let objectUrl = '';
     (async () => {
+      setLoading(true);
+      setErr('');
+      setMediaUrl('');
       try {
-        await Promise.all([load(AdminClient.naturePreviewVideoUrl(themeId), setVideoUrl), load(AdminClient.naturePreviewAudioUrl(themeId), setAudioUrl)]);
+        const token = AdminClient.getToken();
+        const res = await fetch(AdminClient.naturePreviewUrl(themeId), {
+          headers: token ? {
+            Authorization: `Bearer ${token}`
+          } : {}
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = text;
+          try {
+            msg = JSON.parse(text).error || msg;
+          } catch (_) {}
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        if (blob.size < 1000) {
+          throw new Error('Preview file is empty — run Build assets again and wait for status ready');
+        }
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setMediaUrl(objectUrl);
+          setLoading(false);
+        }
       } catch (e) {
-        if (!cancelled) setErr(e.message || 'Preview failed');
+        if (!cancelled) {
+          setErr(e.message || 'Preview failed');
+          setLoading(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [themeId]);
   return /*#__PURE__*/React.createElement("div", {
@@ -4604,41 +4620,31 @@ const NatureAssetPreviewModal = ({
       color: T.muted,
       marginTop: 0
     }
-  }, "Local loop files before YouTube. Video is silent; audio plays separately (same as the live stream)."), err ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: T.err,
-      fontFamily: T.mono,
-      fontSize: 12
-    }
-  }, err) : /*#__PURE__*/React.createElement(React.Fragment, null, videoUrl ? /*#__PURE__*/React.createElement("video", {
-    src: videoUrl,
-    controls: true,
-    autoPlay: true,
-    loop: true,
-    muted: true,
-    playsInline: true,
-    style: {
-      width: '100%',
-      borderRadius: 8,
-      background: '#000',
-      maxHeight: 320
-    }
-  }) : /*#__PURE__*/React.createElement("div", {
+  }, "20-second sample with video and sound (same content as the live stream)."), loading && !err && /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: T.mono,
       color: T.muted,
       fontSize: 12
     }
-  }, "Loading video\u2026"), audioUrl && /*#__PURE__*/React.createElement("audio", {
-    src: audioUrl,
+  }, "Loading preview\u2026"), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: T.err,
+      fontFamily: T.mono,
+      fontSize: 12,
+      lineHeight: 1.5
+    }
+  }, err), mediaUrl && !err && /*#__PURE__*/React.createElement("video", {
+    src: mediaUrl,
     controls: true,
     autoPlay: true,
-    loop: true,
+    playsInline: true,
     style: {
       width: '100%',
-      marginTop: 12
+      borderRadius: 8,
+      background: '#000',
+      maxHeight: 400
     }
-  }))));
+  })));
 };
 const NatureYoutubeConnectionCard = () => {
   const [status, setStatus] = React.useState(null);
@@ -4816,7 +4822,21 @@ const NatureStreamCard = ({
       fontFamily: T.mono,
       color: T.dim
     }
-  }, "thumb \u2713")), stream.lastError && /*#__PURE__*/React.createElement("div", {
+  }, "thumb \u2713")), stream.hasAssets && (stream.videoBytes || stream.audioBytes) ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontFamily: T.mono,
+      color: T.dim,
+      marginBottom: 8
+    }
+  }, "Assets: video ", stream.videoBytes ? `${(stream.videoBytes / 1024 / 1024).toFixed(1)} MB` : '?', ' · ', "audio ", stream.audioBytes ? `${(stream.audioBytes / 1024 / 1024).toFixed(1)} MB` : '?') : st === 'ready' || st === 'idle' ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontFamily: T.mono,
+      color: T.warn,
+      marginBottom: 8
+    }
+  }, "No files on server \u2014 click Build assets") : null, stream.lastError && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontFamily: T.mono,
@@ -4845,7 +4865,8 @@ const NatureStreamCard = ({
     small: true,
     variant: "ghost",
     disabled: busy || !stream.hasAssets,
-    onClick: () => setShowPreview(true)
+    onClick: () => setShowPreview(true),
+    title: stream.hasAssets ? 'Play 20s sample' : 'Build assets first'
   }, "2. Preview local"), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "primary",

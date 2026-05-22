@@ -195,6 +195,28 @@ async function normalizeVideoLoop(srcPath, destPath, maxSec = 45) {
   return destPath;
 }
 
+/** ~20s mux with audio for in-browser preview (faststart for streaming). */
+async function buildPreviewMux(videoPath, audioPath, destPath) {
+  await runFfmpeg([
+    '-y',
+    '-i', videoPath,
+    '-i', audioPath,
+    '-t', '20',
+    '-map', '0:v:0',
+    '-map', '1:a:0',
+    '-c:v', 'libx264',
+    '-preset', 'fast',
+    '-crf', '23',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    '-b:a', '128k',
+    '-movflags', '+faststart',
+    '-shortest',
+    destPath,
+  ], 'preview-mux');
+  return destPath;
+}
+
 async function extractThumbnail(videoPath, thumbPath) {
   await runFfmpeg([
     '-y', '-i', videoPath,
@@ -244,12 +266,16 @@ async function generateAssetsForTheme(themeId) {
 
   await extractThumbnail(videoPath, thumbnailPath);
 
+  const previewPath = path.join(dir, 'preview.mp4');
+  await buildPreviewMux(videoPath, audioPath, previewPath);
+
   if (fs.existsSync(rawAudio)) fs.unlinkSync(rawAudio);
   if (fs.existsSync(rawVideo)) fs.unlinkSync(rawVideo);
 
   return {
     audioPath,
     videoPath,
+    previewPath,
     thumbnailPath,
     title: theme.title,
     description: theme.description,
@@ -262,4 +288,5 @@ module.exports = {
   getNatureLiveDir,
   themeDir,
   generateAssetsForTheme,
+  buildPreviewMux,
 };
