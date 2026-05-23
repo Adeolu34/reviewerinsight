@@ -1,6 +1,13 @@
+# Local dev: docker compose up --build
+# Coolify: uses this file but tags the app image as <resource-uuid>:<commit>.
+# pull_policy: never prevents "pull access denied" after a successful local build.
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: reviewerinsight-app:latest
+    pull_policy: never
     ports:
       - "3000:3000"
     env_file:
@@ -10,9 +17,11 @@ services:
     restart: unless-stopped
     volumes:
       - video-data:/var/data/reviewinsight/videos
+      - nature-live-data:/var/data/reviewinsight/nature-live
 
   mongo:
     image: mongo:7
+    pull_policy: if_not_present
     ports:
       - "27017:27017"
     volumes:
@@ -22,3 +31,4 @@ services:
 volumes:
   mongo-data:
   video-data:
+  nature-live-data:

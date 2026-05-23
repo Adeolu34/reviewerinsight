@@ -1,0 +1,20 @@
+# Production on Coolify when MongoDB is external (Atlas, etc.).
+# In Coolify → Application → Docker Compose location: docker-compose.coolify.yml
+# Set MONGODB_URI in env (do not rely on the mongo service below).
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: reviewerinsight-app:latest
+    pull_policy: never
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - video-data:/var/data/reviewinsight/videos
+      - nature-live-data:/var/data/reviewinsight/nature-live
+
+volumes:
+  video-data:
+  nature-live-data:
