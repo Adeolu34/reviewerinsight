@@ -9,6 +9,7 @@ const { generateSoundEffectFile, isSfxDisabled } = require('./elevenLabs');
 const { downloadNatureVideo } = require('./stockVideo');
 const freesound = require('./freesound');
 const { getNatureAudioFilter, getNatureAudioBitrate } = require('./natureAudio');
+const { openai, model } = require('../config/openai');
 
 const execFileAsync = promisify(execFile);
 
@@ -51,11 +52,11 @@ async function downloadAmbientAudio(theme, destPath, durationSec = 30) {
   if (tryElevenLabs && process.env.ELEVENLABS_API_KEY) {
     try {
       await generateSoundEffectFile(prompt, destPath, {
-        durationSeconds: Math.min(30, durationSec),
+        durationSeconds: Math.min(22, durationSec),
         promptInfluence: parseFloat(process.env.NATURE_ELEVENLABS_INFLUENCE || '0.65', 10),
         loop: process.env.NATURE_ELEVENLABS_LOOP !== 'false',
       });
-      await trimAudioFade(destPath, durationSec);
+      await trimAudioNoFade(destPath, durationSec);
       return { path: destPath, source: 'elevenlabs' };
     } catch (err) {
       logger.warn(`[NatureAssets] ElevenLabs SFX failed (${err.message})`);
@@ -79,15 +80,15 @@ async function downloadAmbientAudio(theme, destPath, durationSec = 30) {
   return { path: destPath, source: 'noise' };
 }
 
-async function trimAudioFade(destPath, durationSec) {
+/** Truncate raw audio to target duration — no fades (seamless loop builder handles transitions). */
+async function trimAudioNoFade(destPath, durationSec) {
   const trimmed = destPath.replace(/\.mp3$/, '_trim.mp3');
   await runFfmpeg([
     '-y', '-i', destPath,
     '-t', String(durationSec),
-    '-af', `afade=t=in:st=0:d=2,afade=t=out:st=${durationSec - 2}:d=2`,
     '-c:a', 'libmp3lame', '-q:a', '4',
     trimmed,
-  ], 'trim-elevenlabs');
+  ], 'trim-audio');
   fs.renameSync(trimmed, destPath);
 }
 
@@ -107,15 +108,7 @@ async function downloadFreesoundAudio(query, destPath, durationSec = 30) {
   }
   await downloadHttps(previewUrl, destPath);
 
-  const trimmed = destPath.replace(/\.mp3$/, '_trim.mp3');
-  await runFfmpeg([
-    '-y', '-i', destPath,
-    '-t', String(durationSec),
-    '-af', 'afade=t=in:st=0:d=2,afade=t=out:st=' + (durationSec - 2) + ':d=2',
-    '-c:a', 'libmp3lame', '-q:a', '4',
-    trimmed,
-  ], 'trim-audio');
-  fs.renameSync(trimmed, destPath);
+  await trimAudioNoFade(destPath, durationSec);
   return destPath;
 }
 
@@ -152,7 +145,7 @@ async function generateNoiseAmbient(destPath, durationSec, flavor) {
     '-y',
     '-f', 'lavfi',
     '-i', `anoisesrc=d=${durationSec}:c=pink:a=${vol}`,
-    '-af', `afade=t=in:st=0:d=2,afade=t=out:st=${durationSec - 2}:d=2,lowpass=f=800`,
+    '-af', 'lowpass=f=800',
     '-c:a', 'libmp3lame', '-q:a', '4',
     destPath,
   ], 'noise-ambient');
@@ -160,16 +153,25 @@ async function generateNoiseAmbient(destPath, durationSec, flavor) {
 }
 
 /**
- * Build seamless ~30s loop: duplicate with short crossfade at seam.
+ * Build seamless ~30s loop: crossfade the tail into the head at the seam point.
+ * When stream_loop -1 restarts the file, the audio character at the boundary is
+ * continuous — imperceptible for stationary ambient sounds (rain, wind, ocean, etc.).
  */
 async function buildSeamlessAudioLoop(srcPath, destPath, loopSec = 30) {
-  const fade = 1.5;
-  const d = loopSec;
+  const fade = 2.0;  // seam crossfade length (seconds)
+  const bodyEnd = loopSec - fade;
   const af = getNatureAudioFilter();
+
+  // body = raw[0 → bodyEnd] at full volume (no fades on the body itself)
+  // seam = acrossfade(raw[bodyEnd → loopSec] → raw[0 → fade])
+  // At the loop restart point: file ends approaching raw[fade]; restarts at raw[0].
+  // For ambient noise this transition is acoustically seamless.
   const filter = [
-    `[0:a]${af},afade=t=in:st=0:d=${fade},afade=t=out:st=${d - fade}:d=${fade}[a0]`,
-    `[1:a]${af},afade=t=in:st=0:d=${fade},afade=t=out:st=${d - fade}:d=${fade}[a1]`,
-    `[a0][a1]acrossfade=d=${fade}:c1=tri:c2=tri[out]`,
+    `[0:a]${af},atrim=0:${bodyEnd},asetpts=PTS-STARTPTS[body]`,
+    `[0:a]${af},atrim=${bodyEnd}:${loopSec},asetpts=PTS-STARTPTS[tail]`,
+    `[1:a]${af},atrim=0:${fade},asetpts=PTS-STARTPTS[head]`,
+    `[tail][head]acrossfade=d=${fade}:c1=tri:c2=tri[seam]`,
+    `[body][seam]concat=n=2:v=0:a=1[out]`,
   ].join(';');
 
   await runFfmpeg([
@@ -178,22 +180,61 @@ async function buildSeamlessAudioLoop(srcPath, destPath, loopSec = 30) {
     '-i', srcPath,
     '-filter_complex', filter,
     '-map', '[out]',
-    '-t', String(d),
+    '-t', String(loopSec),
     '-c:a', 'libmp3lame', '-q:a', '4',
     destPath,
   ], 'seamless-audio');
   return destPath;
 }
 
+async function getVideoDuration(filePath) {
+  try {
+    const ffprobePath = process.env.FFPROBE_PATH || 'ffprobe';
+    const { stdout } = await execFileAsync(ffprobePath, [
+      '-v', 'quiet', '-print_format', 'json', '-show_format', filePath,
+    ], { maxBuffer: 1024 * 1024 });
+    const info = JSON.parse(stdout);
+    return parseFloat(info.format?.duration || '0');
+  } catch { return 0; }
+}
+
+/**
+ * Scale, fps-normalise, and bake a seamless xfade at the loop seam so that
+ * stream_loop -1 produces no visible cut when the clip wraps.
+ */
 async function normalizeVideoLoop(srcPath, destPath, maxSec = 45) {
+  const srcDur = await getVideoDuration(srcPath);
+  const loopDur = srcDur > 0 ? Math.min(maxSec, Math.floor(srcDur)) : maxSec;
+  const fade = Math.min(1.5, loopDur * 0.05); // ≤5 % of duration, max 1.5 s
+  const bodyDur = loopDur - fade;
+
+  const baseFilter = [
+    'scale=1920:1080:force_original_aspect_ratio=decrease',
+    'pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
+    'fps=30',
+    'format=yuv420p',
+  ].join(',');
+
+  // Single input, split into body / tail / head — xfade tail→head at the seam.
+  // End of file fades into the first `fade` seconds of the clip; on loop restart
+  // the visual content is continuous.
+  const filter = [
+    `[0:v]${baseFilter},split=3[va][vb][vc]`,
+    `[va]trim=0:${bodyDur},setpts=PTS-STARTPTS[body]`,
+    `[vb]trim=${bodyDur}:${loopDur},setpts=PTS-STARTPTS[tail]`,
+    `[vc]trim=0:${fade},setpts=PTS-STARTPTS[head]`,
+    `[tail][head]xfade=transition=fade:duration=${fade}:offset=0[seam]`,
+    `[body][seam]concat=n=2:v=1:a=0[out]`,
+  ].join(';');
+
   await runFfmpeg([
     '-y', '-i', srcPath,
-    '-t', String(maxSec),
-    '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30',
+    '-filter_complex', filter,
+    '-map', '[out]',
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
     '-an',
     destPath,
-  ], 'normalize-video');
+  ], 'seamless-video');
   return destPath;
 }
 
@@ -274,16 +315,77 @@ async function generateAssetsForTheme(themeId) {
   if (fs.existsSync(rawAudio)) fs.unlinkSync(rawAudio);
   if (fs.existsSync(rawVideo)) fs.unlinkSync(rawVideo);
 
+  const metadata = await generateNatureMetadata(theme);
+
   return {
     audioPath,
     videoPath,
     previewPath,
     thumbnailPath,
-    title: theme.title,
-    description: theme.description,
+    title: metadata.title,
+    description: metadata.description,
+    tags: metadata.tags,
     audioSource: audioResult.source,
     videoProvider,
   };
+}
+
+function _defaultTags(theme) {
+  return [
+    theme.label.toLowerCase(), 'ambient sounds', 'nature sounds', 'white noise',
+    'sleep sounds', 'focus sounds', 'study music', 'relaxing sounds', '24/7 live',
+    'lofi', 'calm', 'stress relief',
+  ];
+}
+
+/**
+ * Use OpenRouter to generate an SEO-optimised YouTube title, description and tags.
+ * Falls back to the static theme strings when OpenRouter is not configured.
+ */
+async function generateNatureMetadata(theme) {
+  if (!openai) {
+    return { title: theme.title, description: theme.description, tags: _defaultTags(theme) };
+  }
+
+  const prompt = `Generate YouTube live stream metadata for an ambient nature channel.
+
+Theme: ${theme.label}
+Static title: ${theme.title}
+Context: ${theme.description}
+
+Return a JSON object with exactly these keys:
+{
+  "title": "YouTube title (50-70 chars, include '24/7 LIVE', main keyword, no ALL-CAPS spam)",
+  "description": "YouTube description (200-350 chars, mention the sound, uses like sleep/focus/study, end with 'Reviewer Insight')",
+  "tags": ["tag1","tag2",...] // 12-15 tags mixing: specific sound, 'ambient sounds', 'white noise', 'sleep sounds', 'focus music', 'study music', 'relaxing', 'nature sounds', '24/7 live', plus 3-4 niche tags
+}
+
+Return only the JSON, no markdown.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: 'You write concise YouTube metadata for ambient nature streams. Return valid JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    });
+
+    const raw = response.choices[0].message.content || '';
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(jsonStr);
+
+    return {
+      title: String(parsed.title || theme.title).slice(0, 100),
+      description: String(parsed.description || theme.description).slice(0, 5000),
+      tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 15) : _defaultTags(theme),
+    };
+  } catch (err) {
+    logger.warn(`[NatureAssets] Metadata generation failed (${err.message}) — using defaults`);
+    return { title: theme.title, description: theme.description, tags: _defaultTags(theme) };
+  }
 }
 
 /**
@@ -317,6 +419,7 @@ module.exports = {
   getNatureLiveDir,
   themeDir,
   generateAssetsForTheme,
+  generateNatureMetadata,
   buildPreviewMux,
   exportLongTest,
 };

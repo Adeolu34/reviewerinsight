@@ -199,8 +199,9 @@ async function prepareStream(themeId) {
   try {
     const title = doc.title || `Nature Live — ${themeId}`;
     const description = doc.description || '';
+    const tags = Array.isArray(doc.tags) ? doc.tags : [];
 
-    const session = await natureYoutube.createLiveSession({ title, description });
+    const session = await natureYoutube.createLiveSession({ title, description, tags });
     await NatureStream.findByIdAndUpdate(doc._id, { $set: { ...session, title, description } });
 
     doc = await NatureStream.findOne({ themeId });
@@ -251,6 +252,7 @@ async function watchdogTick() {
             const session = await natureYoutube.createLiveSession({
               title: doc.title,
               description: doc.description,
+              tags: Array.isArray(doc.tags) ? doc.tags : [],
             });
             await NatureStream.findByIdAndUpdate(doc._id, { $set: session });
             doc = await NatureStream.findOne({ themeId: doc.themeId });

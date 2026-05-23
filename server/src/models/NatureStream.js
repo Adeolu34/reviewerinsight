@@ -15,6 +15,7 @@ const natureStreamSchema = new mongoose.Schema({
   },
   title: { type: String },
   description: { type: String },
+  tags: [{ type: String }],
   audioPath: { type: String },
   videoPath: { type: String },
   previewPath: { type: String },

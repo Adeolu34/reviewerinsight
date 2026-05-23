@@ -264,6 +264,7 @@ router.post('/:themeId/generate-assets', async (req, res, next) => {
               thumbnailPath: assets.thumbnailPath,
               title: assets.title,
               description: assets.description,
+              tags: assets.tags || [],
               assetsGeneratedAt: new Date(),
               lastError: null,
             },

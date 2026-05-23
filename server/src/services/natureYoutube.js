@@ -74,7 +74,7 @@ async function getChannelInfo() {
 /**
  * Create liveStream + liveBroadcast, bind, return ingest details.
  */
-async function createLiveSession({ title, description }) {
+async function createLiveSession({ title, description, tags = [] }) {
   const auth = await getClient();
   const yt = google.youtube({ version: 'v3', auth });
 
@@ -127,6 +127,26 @@ async function createLiveSession({ title, description }) {
     part: ['id', 'contentDetails'],
     streamId,
   });
+
+  if (tags.length > 0) {
+    try {
+      await yt.videos.update({
+        part: ['snippet'],
+        requestBody: {
+          id: broadcastId,
+          snippet: {
+            title: title.slice(0, 100),
+            description: description?.slice(0, 5000) || '',
+            tags: tags.slice(0, 500),
+            categoryId: '22', // People & Blogs — closest for ambient/chill live
+          },
+        },
+      });
+      logger.info(`[NatureYouTube] Tags set on broadcast ${broadcastId}`);
+    } catch (err) {
+      logger.warn(`[NatureYouTube] Could not set tags: ${err.message}`);
+    }
+  }
 
   const watchUrl = `https://www.youtube.com/watch?v=${broadcastId}`;
   const studioUrl = `https://studio.youtube.com/video/${broadcastId}/livestreaming`;
