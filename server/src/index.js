@@ -123,7 +123,6 @@ async function startServer() {
   app.use('/api/authors', authorsRouter);
 
   // Video streaming — public, supports Range requests for seeking
-  const fs = require('fs');
   app.get('/videos/:id/stream', async (req, res, next) => {
     try {
       const job = await VideoJob.findById(req.params.id).lean();
