@@ -2221,7 +2221,7 @@ const NatureYoutubeConnectionCard = () => {
       </div>
       <div style={{ fontSize: 11, fontFamily: T.sans, color: T.warn, marginBottom: 12, lineHeight: 1.5, padding: 10, borderRadius: 6, background: `${T.warn}15` }}>
         YouTube must <strong>approve live streaming</strong> on this channel first (Studio → Create → Go live once, verify phone, up to 24h).
-        Until then use <strong>Export 1h test</strong> on each theme card to review the full loop locally — no YouTube needed.
+        Until then use <strong>Export 15m test</strong> on each theme card to review the loop locally — no YouTube needed.
       </div>
       {loading ? (
         <div style={{ fontFamily: T.mono, fontSize: 12, color: T.muted }}>Checking…</div>
@@ -2248,9 +2248,33 @@ const NatureYoutubeConnectionCard = () => {
   );
 };
 
+const NatureExportPreviewModal = ({ themeId, label, minutes, onClose }) => {
+  const mediaUrl = React.useMemo(() => {
+    if (!AdminClient.getToken()) return '';
+    return AdminClient.natureExportTestStreamUrl(themeId);
+  }, [themeId]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={onClose}>
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: 20, maxWidth: 900, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 style={{ fontFamily: T.serif, margin: 0 }}>Export — {label} ({minutes || 15} min)</h3>
+          <Btn small variant="ghost" onClick={onClose}>Close</Btn>
+        </div>
+        {mediaUrl ? (
+          <video key={mediaUrl} src={mediaUrl} controls playsInline style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: 480 }} />
+        ) : (
+          <div style={{ fontFamily: T.mono, color: T.muted }}>Sign in to play export</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
   const [localMsg, setLocalMsg] = React.useState('');
   const [showPreview, setShowPreview] = React.useState(false);
+  const [showExportPreview, setShowExportPreview] = React.useState(false);
   const st = stream?.status || 'idle';
   const color = NATURE_STATUS_COLORS[st] || T.dim;
   const studioUrl = stream.youtubeStudioUrl
@@ -2288,6 +2312,13 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
       ) : st === 'ready' || st === 'idle' ? (
         <div style={{ fontSize: 10, fontFamily: T.mono, color: T.warn, marginBottom: 8 }}>No files on server — click Build assets</div>
       ) : null}
+      {st === 'exporting' && (
+        <div style={{ fontSize: 11, fontFamily: T.mono, color: T.warn, marginBottom: 8 }}>
+          Exporting…
+          {stream.testExportBytes > 0 ? ` ${(stream.testExportBytes / 1024 / 1024).toFixed(1)} MB written` : ' starting ffmpeg'}
+          {' '}(~5–15 min encode on a small VPS)
+        </div>
+      )}
       {stream.lastError && (
         <div style={{ fontSize: 11, fontFamily: T.mono, color: T.err, marginBottom: 8, wordBreak: 'break-word' }}>{stream.lastError}</div>
       )}
@@ -2301,13 +2332,28 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
         <Btn small variant="ghost" disabled={busy || !stream.hasAssets} onClick={() => setShowPreview(true)} title={stream.hasAssets ? 'Play 20s sample' : 'Build assets first'}>
           2. Preview
         </Btn>
-        <Btn small variant="ghost" disabled={busy || !stream.hasAssets || st === 'exporting'} onClick={() => act(() => AdminClient.exportNatureTest(stream.themeId, 60), 'Export started (~5–15 min)')}>
-          Export 1h test
+        <Btn small variant="ghost" disabled={busy || !stream.hasAssets || st === 'exporting'} onClick={() => act(() => AdminClient.exportNatureTest(stream.themeId, 15), 'Export started (~5–15 min)')}>
+          Export 15m test
         </Btn>
-        {stream.testExportReady && (
-          <Btn small variant="ghost" onClick={() => window.open(AdminClient.natureExportTestDownloadUrl(stream.themeId), '_blank')}>
-            Download {stream.testExportMinutes || 60}m ↗
+        {st === 'exporting' && (
+          <Btn small variant="danger" disabled={busy} onClick={() => act(() => AdminClient.cancelNatureExport(stream.themeId), 'Export cancelled')}>
+            Cancel export
           </Btn>
+        )}
+        {st === 'exporting' && (
+          <Btn small variant="ghost" disabled={busy} onClick={() => act(() => AdminClient.resetNatureExport(stream.themeId), 'Export state reset')}>
+            Reset stuck
+          </Btn>
+        )}
+        {stream.testExportReady && (
+          <>
+            <Btn small variant="ghost" onClick={() => setShowExportPreview(true)}>
+              Play export
+            </Btn>
+            <Btn small variant="ghost" onClick={() => window.open(AdminClient.natureExportTestDownloadUrl(stream.themeId), '_blank')}>
+              Download {stream.testExportMinutes || 15}m ↗
+            </Btn>
+          </>
         )}
         <Btn small variant="primary" disabled={busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating'} onClick={() => act(() => AdminClient.prepareNatureStream(stream.themeId), 'Preparing YouTube preview…')}>
           3. Prepare (YT preview)
@@ -2327,6 +2373,14 @@ const NatureStreamCard = ({ stream, theme, onRefresh, busy, setBusy }) => {
       </div>
       {showPreview && (
         <NatureAssetPreviewModal themeId={stream.themeId} label={theme?.label || stream.themeId} onClose={() => setShowPreview(false)} />
+      )}
+      {showExportPreview && stream.testExportReady && (
+        <NatureExportPreviewModal
+          themeId={stream.themeId}
+          label={theme?.label || stream.themeId}
+          minutes={stream.testExportMinutes}
+          onClose={() => setShowExportPreview(false)}
+        />
       )}
       {localMsg && <div style={{ marginTop: 8, fontSize: 11, fontFamily: T.mono, color: localMsg.startsWith('✗') ? T.err : T.ok }}>{localMsg}</div>}
     </div>

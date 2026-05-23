@@ -45,7 +45,7 @@ Optional: store token in env `NATURE_YOUTUBE_REFRESH_TOKEN` instead of MongoDB `
 
 ## Automatic storage cleanup
 
-The server runs **storage cleanup** on a schedule (default every **6 hours**, plus **60s after boot** and after each **Export 1h test** completes).
+The server runs **storage cleanup** on a schedule (default every **6 hours**, plus **60s after boot** and after each **Export 15m test** completes).
 
 It removes:
 

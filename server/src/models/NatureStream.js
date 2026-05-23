@@ -20,6 +20,7 @@ const natureStreamSchema = new mongoose.Schema({
   previewPath: { type: String },
   testExportPath: { type: String },
   testExportMinutes: { type: Number },
+  exportStartedAt: { type: Date },
   thumbnailPath: { type: String },
   youtubeBroadcastId: { type: String },
   youtubeStreamId: { type: String },

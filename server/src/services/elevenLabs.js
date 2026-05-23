@@ -11,6 +11,27 @@ const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1';
 // https://api.elevenlabs.io/v1/voices to list available voices
 const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
 
+let sfxDisabledForSession = false;
+
+function isSfxPermissionError(err) {
+  return err?.status === 401 && String(err.message || '').includes('sound_generation');
+}
+
+function disableSfxForSession() {
+  if (!sfxDisabledForSession) {
+    sfxDisabledForSession = true;
+    logger.warn(
+      '[ElevenLabs] Sound Effects API disabled for this server process — API key lacks sound_generation. ' +
+      'Nature audio will use Freesound/noise. Enable SFX on your ElevenLabs plan or set ELEVENLABS_SFX_DISABLED=true.',
+    );
+  }
+}
+
+function isSfxDisabled() {
+  return sfxDisabledForSession
+    || ['1', 'true', 'yes'].includes(String(process.env.ELEVENLABS_SFX_DISABLED || '').toLowerCase());
+}
+
 const DEFAULT_VOICE_SETTINGS = {
   stability: 0.5,
   similarity_boost: 0.75,
@@ -127,6 +148,11 @@ async function getVoices() {
  */
 async function generateSoundEffect(text, options = {}) {
   if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not set in environment');
+  if (isSfxDisabled()) {
+    const err = new Error('ElevenLabs SFX disabled (missing sound_generation or ELEVENLABS_SFX_DISABLED)');
+    err.status = 401;
+    throw err;
+  }
 
   const body = JSON.stringify({
     text,
@@ -174,14 +200,24 @@ async function generateSoundEffect(text, options = {}) {
 }
 
 async function generateSoundEffectFile(text, outputPath, options = {}) {
+  if (isSfxDisabled()) {
+    const err = new Error('ElevenLabs SFX disabled (missing sound_generation or ELEVENLABS_SFX_DISABLED)');
+    err.status = 401;
+    throw err;
+  }
   logger.info(`ElevenLabs SFX: "${text.slice(0, 60)}…" → ${outputPath}`);
-  const audioBuffer = await withRetry(
-    () => generateSoundEffect(text, options),
-    { maxAttempts: 3, baseDelayMs: 3000, label: 'ElevenLabs SFX' },
-  );
-  await fs.promises.writeFile(outputPath, audioBuffer);
-  logger.info(`ElevenLabs SFX: saved ${audioBuffer.length} bytes`);
-  return outputPath;
+  try {
+    const audioBuffer = await withRetry(
+      () => generateSoundEffect(text, options),
+      { maxAttempts: 3, baseDelayMs: 3000, label: 'ElevenLabs SFX' },
+    );
+    await fs.promises.writeFile(outputPath, audioBuffer);
+    logger.info(`ElevenLabs SFX: saved ${audioBuffer.length} bytes`);
+    return outputPath;
+  } catch (err) {
+    if (isSfxPermissionError(err)) disableSfxForSession();
+    throw err;
+  }
 }
 
 module.exports = {
@@ -191,4 +227,6 @@ module.exports = {
   generateSoundEffectFile,
   estimateDurationSeconds,
   getVoices,
+  isSfxDisabled,
+  isSfxPermissionError,
 };

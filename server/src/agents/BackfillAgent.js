@@ -5,6 +5,7 @@ const { generateReview, generateChapterSummary } = require('../services/openaiRe
 const EditorAgent = require('./EditorAgent');
 const config = require('../config/env');
 const logger = require('../utils/logger');
+const llmCredits = require('../utils/llmCredits');
 
 const REVIEW_CONCURRENCY = 3;
 const CHAPTER_CONCURRENCY = 2;
@@ -39,6 +40,11 @@ class BackfillAgent {
   async run() {
     if (this.running) {
       logger.info('BackfillAgent: previous run still active, skipping tick');
+      return;
+    }
+
+    if (llmCredits.isPaused()) {
+      logger.warn(`BackfillAgent: skipped — ${llmCredits.pauseReason()}`);
       return;
     }
 
@@ -152,12 +158,21 @@ class BackfillAgent {
           tokens += r.value;
           logger.info(`BackfillAgent: review done — "${book.title}"`);
         } else {
-          failed++;
           const msg = r.reason?.message || 'Unknown error';
+          if (llmCredits.isCreditsError(r.reason)) {
+            llmCredits.noteFailure(r.reason);
+            continue;
+          }
+          failed++;
           run.errors.push({ bookTitle: book.title, error: msg, timestamp: new Date() });
           await Book.findByIdAndUpdate(book._id, { status: 'failed', errorLog: msg });
           logger.error(`BackfillAgent: review failed — "${book.title}": ${msg}`);
         }
+      }
+      if (llmCredits.isPaused()) {
+        run.errors.push({ bookTitle: '(credits)', error: llmCredits.pauseReason(), timestamp: new Date() });
+        logger.error('BackfillAgent: stopping — insufficient API credits');
+        break;
       }
     }
 
@@ -182,9 +197,18 @@ class BackfillAgent {
           logger.info(`BackfillAgent: chapters done — "${book.title}"`);
         } else {
           const msg = r.reason?.message || 'Unknown error';
+          if (llmCredits.isCreditsError(r.reason)) {
+            llmCredits.noteFailure(r.reason);
+            continue;
+          }
           run.errors.push({ bookTitle: book.title, error: `chapters: ${msg}`, timestamp: new Date() });
           logger.warn(`BackfillAgent: chapters failed — "${book.title}": ${msg}`);
         }
+      }
+      if (llmCredits.isPaused()) {
+        run.errors.push({ bookTitle: '(credits)', error: llmCredits.pauseReason(), timestamp: new Date() });
+        logger.warn('BackfillAgent: chapters stopped — insufficient API credits');
+        break;
       }
     }
 

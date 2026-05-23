@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const EditorAgent = require('./EditorAgent');
 const AuthorBioAgent = require('./AuthorBioAgent');
 const logger = require('../utils/logger');
+const llmCredits = require('../utils/llmCredits');
 
 class AgentOrchestrator {
   constructor() {
@@ -37,6 +38,10 @@ class AgentOrchestrator {
 
     for (const { cron: cronExpr, editor, batchSize } of schedule) {
       const job = cron.schedule(cronExpr, async () => {
+        if (llmCredits.isPaused()) {
+          logger.warn(`Scheduled run skipped for ${editor} — ${llmCredits.pauseReason()}`);
+          return;
+        }
         logger.info(`Scheduled run triggered for ${editor} (batch: ${batchSize})`);
         try {
           await this.runAgent(editor, { batchSize });

@@ -7,7 +7,8 @@ const { NATURE_THEMES } = require('../config/natureThemes');
 const natureYoutube = require('../services/natureYoutube');
 const stockVideo = require('../services/stockVideo');
 const freesound = require('../services/freesound');
-const { generateAssetsForTheme, buildPreviewMux, exportLongTest, themeDir } = require('../services/natureAssets');
+const { generateAssetsForTheme, buildPreviewMux, themeDir } = require('../services/natureAssets');
+const natureExportManager = require('../services/natureExportManager');
 const supervisor = require('../services/natureStreamSupervisor');
 const requireAdmin = require('../middleware/requireAdmin');
 const logger = require('../utils/logger');
@@ -58,7 +59,7 @@ router.get('/youtube/callback', async (req, res) => {
 
 // Allow <video src="/api/.../preview?token=..."> (cannot send Authorization header on media elements)
 router.use((req, res, next) => {
-  if (req.method === 'GET' && /\/(preview|export-test)(\/|$)/.test(req.path) && req.query.token && !req.headers.authorization) {
+  if (req.method === 'GET' && /\/(preview|export-test)/.test(req.path) && req.query.token && !req.headers.authorization) {
     req.headers.authorization = `Bearer ${req.query.token}`;
   }
   next();
@@ -164,18 +165,27 @@ router.get('/status', async (req, res, next) => {
             youtubeLifeCycle = b?.status?.lifeCycleStatus || null;
           } catch (_) {}
         }
-        const video = mediaFileStats(s.videoPath);
-        const audio = mediaFileStats(s.audioPath);
-        const preview = mediaFileStats(s.previewPath);
+        const exportInfo = await natureExportManager.reconcileExportState(s);
+        const fresh = exportInfo.recovered
+          ? await NatureStream.findOne({ themeId: s.themeId }).lean()
+          : s;
+        const video = mediaFileStats(fresh.videoPath);
+        const audio = mediaFileStats(fresh.audioPath);
+        const preview = mediaFileStats(fresh.previewPath);
+        const exportPath = fresh.testExportPath;
+        const exportFile = mediaFileStats(exportPath);
         return {
-          ...s,
+          ...fresh,
           hasAssets: video.exists && audio.exists && video.bytes > 500 && audio.bytes > 500,
           hasPreview: preview.exists && preview.bytes > 1000,
           videoBytes: video.bytes,
           audioBytes: audio.bytes,
           previewBytes: preview.bytes,
-          testExportReady: !!(s.testExportPath && fs.existsSync(s.testExportPath)),
-          testExportMinutes: s.testExportMinutes || null,
+          testExportReady: exportFile.exists && exportFile.bytes > 1_000_000,
+          testExportMinutes: fresh.testExportMinutes || null,
+          testExportBytes: exportFile.bytes,
+          exportActive: exportInfo.exportActive,
+          exportStartedAt: exportInfo.exportStartedAt || fresh.exportStartedAt,
           youtubeLifeCycle,
         };
       })),
@@ -320,40 +330,86 @@ router.post('/:themeId/export-test', async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid theme' });
     }
 
-    const minutes = Math.min(Math.max(parseInt(req.body?.minutes, 10) || 60, 1), 180);
-    const doc = await NatureStream.findOne({ themeId });
+    const defaultMin = parseInt(process.env.NATURE_EXPORT_DEFAULT_MINUTES, 10) || 15;
+    const minutes = Math.min(Math.max(parseInt(req.body?.minutes, 10) || defaultMin, 1), 60);
+    let doc = await NatureStream.findOne({ themeId });
     if (!doc?.videoPath || !doc?.audioPath || !fs.existsSync(doc.videoPath) || !fs.existsSync(doc.audioPath)) {
       return res.status(400).json({ error: 'Build assets first' });
     }
+
     if (doc.status === 'exporting') {
-      return res.status(400).json({ error: 'Export already running' });
+      if (natureExportManager.isActive(themeId)) {
+        return res.status(400).json({ error: 'Export already running' });
+      }
+      await natureExportManager.resetStuckExport(themeId);
+      doc = await NatureStream.findOne({ themeId });
     }
 
-    const outPath = path.join(themeDir(themeId), `test_${minutes}min.mp4`);
+    const outPath = natureExportManager.expectedExportPath(themeId, minutes);
     await NatureStream.findByIdAndUpdate(doc._id, {
-      $set: { status: 'exporting', lastError: null, testExportPath: null, testExportMinutes: minutes },
+      $set: {
+        status: 'exporting',
+        lastError: null,
+        testExportPath: outPath,
+        testExportMinutes: minutes,
+        exportStartedAt: new Date(),
+      },
     });
 
-    res.json({ ok: true, message: `Rendering ${minutes}-minute test file (no YouTube needed). This can take several minutes.` });
+    const estLo = Math.max(3, Math.round(minutes * 0.4));
+    const estHi = Math.max(estLo + 2, Math.round(minutes * 1.2));
+    res.json({
+      ok: true,
+      message: `Rendering ${minutes}-minute file (~${estLo}–${estHi} min on VPS). Status updates every 5s.`,
+    });
 
-    const durationSec = minutes * 60;
-    exportLongTest(doc.videoPath, doc.audioPath, outPath, durationSec)
-      .then(async () => {
-        await NatureStream.findOneAndUpdate(
-          { themeId },
-          { $set: { status: 'ready', testExportPath: outPath, testExportMinutes: minutes, lastError: null } },
-        );
-        logger.info(`[NatureLive] Test export ready ${themeId} ${minutes}min`);
-        const storageCleanup = require('../services/storageCleanup');
-        storageCleanup.runStorageCleanup({ reason: 'after-export' }).catch(() => {});
-      })
-      .catch(async (err) => {
-        await NatureStream.findOneAndUpdate(
-          { themeId },
-          { $set: { status: 'error', lastError: `Export: ${err.message}` } },
-        );
-        logger.error(`[NatureLive] Test export failed ${themeId}: ${err.message}`);
-      });
+    natureExportManager.startExport(themeId, doc, minutes).catch((err) => {
+      logger.error(`[NatureExport] startExport ${themeId}: ${err.message}`);
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:themeId/export-test/cancel', async (req, res, next) => {
+  try {
+    await natureExportManager.cancelExport(req.params.themeId);
+    res.json({ ok: true, message: 'Export cancelled' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:themeId/export-test/reset', async (req, res, next) => {
+  try {
+    const result = await natureExportManager.resetStuckExport(req.params.themeId);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function resolveTestExportPath(themeId) {
+  let doc = await NatureStream.findOne({ themeId });
+  if (!doc) return null;
+  await natureExportManager.reconcileExportState(doc);
+  doc = await NatureStream.findOne({ themeId });
+  const minutes = doc.testExportMinutes || parseInt(process.env.NATURE_EXPORT_DEFAULT_MINUTES, 10) || 15;
+  const candidate = doc.testExportPath || natureExportManager.expectedExportPath(themeId, minutes);
+  if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).size > 1_000_000) {
+    return { doc, filePath: candidate };
+  }
+  return null;
+}
+
+router.get('/:themeId/export-test/stream', async (req, res, next) => {
+  try {
+    const resolved = await resolveTestExportPath(req.params.themeId);
+    if (!resolved) {
+      return res.status(404).json({ error: 'No test export ready — wait for export to finish or reset and try again' });
+    }
+    res.setHeader('Content-Disposition', 'inline');
+    return sendMediaFile(res, resolved.filePath, 'video/mp4');
   } catch (err) {
     next(err);
   }
@@ -361,12 +417,13 @@ router.post('/:themeId/export-test', async (req, res, next) => {
 
 router.get('/:themeId/export-test/download', async (req, res, next) => {
   try {
-    const doc = await NatureStream.findOne({ themeId: req.params.themeId });
-    if (!doc?.testExportPath || !fs.existsSync(doc.testExportPath)) {
-      return res.status(404).json({ error: 'No test export — click Export 1h test first' });
+    const resolved = await resolveTestExportPath(req.params.themeId);
+    if (!resolved) {
+      return res.status(404).json({ error: 'No test export — wait for export to finish' });
     }
-    res.setHeader('Content-Disposition', `attachment; filename="nature-${doc.themeId}-test.mp4"`);
-    return sendMediaFile(res, doc.testExportPath, 'video/mp4');
+    const mins = resolved.doc.testExportMinutes || parseInt(process.env.NATURE_EXPORT_DEFAULT_MINUTES, 10) || 15;
+    res.setHeader('Content-Disposition', `attachment; filename="nature-${resolved.doc.themeId}-${mins}min.mp4"`);
+    return sendMediaFile(res, resolved.filePath, 'video/mp4');
   } catch (err) {
     next(err);
   }

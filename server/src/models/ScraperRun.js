@@ -12,7 +12,7 @@ const scraperRunSchema = new mongoose.Schema({
   booksFailed:    { type: Number, default: 0 },
   errors:         [{ title: String, error: String, timestamp: Date }],
   durationMs:     { type: Number },
-}, { timestamps: true });
+}, { timestamps: true, suppressReservedKeysWarning: true });
 
 scraperRunSchema.index({ source: 1, startedAt: -1 });
 

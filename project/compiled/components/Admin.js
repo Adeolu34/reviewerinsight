@@ -4625,6 +4625,71 @@ const NatureAssetPreviewModal = ({
     }
   }, "Preparing preview URL\u2026") : null));
 };
+const NatureExportPreviewModal = ({
+  themeId,
+  label,
+  minutes,
+  onClose
+}) => {
+  const mediaUrl = React.useMemo(() => {
+    if (!AdminClient.getToken()) return '';
+    return AdminClient.natureExportTestStreamUrl(themeId);
+  }, [themeId]);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,.75)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: T.card,
+      border: `1px solid ${T.border}`,
+      borderRadius: 10,
+      padding: 20,
+      maxWidth: 900,
+      width: '100%'
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontFamily: T.serif,
+      margin: 0
+    }
+  }, "Export \u2014 ", label, " (", minutes || 15, " min)"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: onClose
+  }, "Close")), mediaUrl ? /*#__PURE__*/React.createElement("video", {
+    key: mediaUrl,
+    src: mediaUrl,
+    controls: true,
+    playsInline: true,
+    style: {
+      width: '100%',
+      borderRadius: 8,
+      background: '#000',
+      maxHeight: 480
+    }
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      color: T.muted
+    }
+  }, "Sign in to play export")));
+};
 const NatureYoutubeConnectionCard = () => {
   const [status, setStatus] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -4698,7 +4763,7 @@ const NatureYoutubeConnectionCard = () => {
       borderRadius: 6,
       background: `${T.warn}15`
     }
-  }, "YouTube must ", /*#__PURE__*/React.createElement("strong", null, "approve live streaming"), " on this channel first (Studio \u2192 Create \u2192 Go live once, verify phone, up to 24h). Until then use ", /*#__PURE__*/React.createElement("strong", null, "Export 1h test"), " on each theme card to review the full loop locally \u2014 no YouTube needed."), loading ? /*#__PURE__*/React.createElement("div", {
+  }, "YouTube must ", /*#__PURE__*/React.createElement("strong", null, "approve live streaming"), " on this channel first (Studio \u2192 Create \u2192 Go live once, verify phone, up to 24h). Until then use ", /*#__PURE__*/React.createElement("strong", null, "Export 15m test"), " on each theme card to review the loop locally \u2014 no YouTube needed."), loading ? /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: T.mono,
       fontSize: 12,
@@ -4762,6 +4827,7 @@ const NatureStreamCard = ({
 }) => {
   const [localMsg, setLocalMsg] = React.useState('');
   const [showPreview, setShowPreview] = React.useState(false);
+  const [showExportPreview, setShowExportPreview] = React.useState(false);
   const st = stream?.status || 'idle';
   const color = NATURE_STATUS_COLORS[st] || T.dim;
   const studioUrl = stream.youtubeStudioUrl || (stream.youtubeBroadcastId ? `https://studio.youtube.com/video/${stream.youtubeBroadcastId}/livestreaming` : null);
@@ -4826,7 +4892,14 @@ const NatureStreamCard = ({
       color: T.warn,
       marginBottom: 8
     }
-  }, "No files on server \u2014 click Build assets") : null, stream.lastError && /*#__PURE__*/React.createElement("div", {
+  }, "No files on server \u2014 click Build assets") : null, st === 'exporting' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontFamily: T.mono,
+      color: T.warn,
+      marginBottom: 8
+    }
+  }, "Exporting\u2026", stream.testExportBytes > 0 ? ` ${(stream.testExportBytes / 1024 / 1024).toFixed(1)} MB written` : ' starting ffmpeg', ' (~5\u201315 min encode on a small VPS)'), stream.lastError && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontFamily: T.mono,
@@ -4861,12 +4934,26 @@ const NatureStreamCard = ({
     small: true,
     variant: "ghost",
     disabled: busy || !stream.hasAssets || st === 'exporting',
-    onClick: () => act(() => AdminClient.exportNatureTest(stream.themeId, 60), 'Export started (~5–15 min)')
-  }, "Export 1h test"), stream.testExportReady && /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => act(() => AdminClient.exportNatureTest(stream.themeId, 15), 'Export started (~5\u201315 min)')
+  }, "Export 15m test"), st === 'exporting' && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "danger",
+    disabled: busy,
+    onClick: () => act(() => AdminClient.cancelNatureExport(stream.themeId), 'Export cancelled')
+  }, "Cancel export"), st === 'exporting' && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    disabled: busy,
+    onClick: () => act(() => AdminClient.resetNatureExport(stream.themeId), 'Export state reset')
+  }, "Reset stuck"), stream.testExportReady && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => setShowExportPreview(true)
+  }, "Play export"), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "ghost",
     onClick: () => window.open(AdminClient.natureExportTestDownloadUrl(stream.themeId), '_blank')
-  }, "Download ", stream.testExportMinutes || 60, "m \u2197"), /*#__PURE__*/React.createElement(Btn, {
+  }, "Download ", stream.testExportMinutes || 15, "m \u2197")), /*#__PURE__*/React.createElement(Btn, {
     small: true,
     variant: "primary",
     disabled: busy || !stream.hasAssets || st === 'live' || st === 'preview' || st === 'starting' || st === 'generating',
@@ -4893,6 +4980,11 @@ const NatureStreamCard = ({
     themeId: stream.themeId,
     label: theme?.label || stream.themeId,
     onClose: () => setShowPreview(false)
+  }), showExportPreview && stream.testExportReady && /*#__PURE__*/React.createElement(NatureExportPreviewModal, {
+    themeId: stream.themeId,
+    label: theme?.label || stream.themeId,
+    minutes: stream.testExportMinutes,
+    onClose: () => setShowExportPreview(false)
   }), localMsg && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,

@@ -651,6 +651,7 @@ router.get('/system', async (req, res, next) => {
         openaiConfigured: !!config.openaiKey,
         openrouterConfigured: !!config.openrouterKey,
         llmApiKeyConfigured: !!(config.openrouterKey || config.openaiKey),
+        llmCredits: require('../utils/llmCredits').getStatus(),
         nodeEnv: config.nodeEnv,
       },
       schedule: scheduleWithNext,

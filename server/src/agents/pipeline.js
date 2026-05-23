@@ -5,6 +5,7 @@ const { generateReview, generateChapterSummary } = require('../services/openaiRe
 const { generateCoverDesign } = require('../services/coverResolver');
 const { isDuplicate } = require('../utils/dedup');
 const logger = require('../utils/logger');
+const llmCredits = require('../utils/llmCredits');
 
 // Concurrent LLM requests — tuned for OpenRouter / provider rate limits.
 const REVIEW_CONCURRENCY = 5;
@@ -59,6 +60,16 @@ async function runPipeline(persona, options = {}) {
   });
 
   logger.info(`Agent run started: ${persona.name} (run: ${run._id}, batch: ${batchSize})`);
+
+  if (llmCredits.isPaused()) {
+    run.status = 'failed';
+    run.completedAt = new Date();
+    run.durationMs = 0;
+    run.errors.push({ bookTitle: '(credits)', error: llmCredits.pauseReason(), timestamp: new Date() });
+    await run.save();
+    logger.warn(`Agent run skipped: ${persona.name} — ${llmCredits.pauseReason()}`);
+    return run._id.toString();
+  }
 
   try {
     let booksToProcess = [];
@@ -135,11 +146,26 @@ async function runPipeline(persona, options = {}) {
           run.estimatedCost += (r.value.tokensUsed * 0.6) / 1000000;
           logger.info(`Review complete: "${book.title}"`);
         } else {
+          const msg = r.reason?.message || 'Unknown error';
+          if (llmCredits.isCreditsError(r.reason)) {
+            llmCredits.noteFailure(r.reason);
+            continue;
+          }
           run.booksFailed += 1;
-          run.errors.push({ bookTitle: book.title, error: r.reason?.message || 'Unknown error', timestamp: new Date() });
-          await Book.findByIdAndUpdate(book._id, { status: 'failed', errorLog: r.reason?.message });
-          logger.error(`Review failed for "${book.title}": ${r.reason?.message}`);
+          run.errors.push({ bookTitle: book.title, error: msg, timestamp: new Date() });
+          await Book.findByIdAndUpdate(book._id, { status: 'failed', errorLog: msg });
+          logger.error(`Review failed for "${book.title}": ${msg}`);
         }
+      }
+
+      if (llmCredits.isPaused()) {
+        run.errors.push({
+          bookTitle: '(credits)',
+          error: llmCredits.pauseReason(),
+          timestamp: new Date(),
+        });
+        logger.error(`Agent run stopped (${persona.name}): insufficient API credits`);
+        break;
       }
 
       // Persist progress after every chunk so admin dashboard stays live

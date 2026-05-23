@@ -5,7 +5,7 @@ const { promisify } = require('util');
 const https = require('https');
 const logger = require('../utils/logger');
 const { getTheme } = require('../config/natureThemes');
-const { generateSoundEffectFile } = require('./elevenLabs');
+const { generateSoundEffectFile, isSfxDisabled } = require('./elevenLabs');
 const { downloadNatureVideo } = require('./stockVideo');
 const freesound = require('./freesound');
 const { getNatureAudioFilter, getNatureAudioBitrate } = require('./natureAudio');
@@ -47,7 +47,7 @@ async function downloadAmbientAudio(theme, destPath, durationSec = 30) {
   const prompt = theme.audioPrompt || theme.audioQuery;
   const pref = getAudioProviderPreference();
 
-  const tryElevenLabs = pref === 'elevenlabs' || pref === 'auto';
+  const tryElevenLabs = (pref === 'elevenlabs' || pref === 'auto') && !isSfxDisabled();
   if (tryElevenLabs && process.env.ELEVENLABS_API_KEY) {
     try {
       await generateSoundEffectFile(prompt, destPath, {

@@ -15,6 +15,6 @@ const agentRunSchema = new mongoose.Schema({
   errors:          [{ bookTitle: String, error: String, timestamp: Date }],
   searchQueries:   [{ type: String }],
   durationMs:      { type: Number },
-}, { timestamps: true });
+}, { timestamps: true, suppressReservedKeysWarning: true });
 
 module.exports = mongoose.model('AgentRun', agentRunSchema);

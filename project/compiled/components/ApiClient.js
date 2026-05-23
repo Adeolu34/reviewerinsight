@@ -427,7 +427,7 @@ const AdminClient = {
   getNatureBroadcastStatus(themeId) {
     return this._fetch(`/nature-live/${themeId}/broadcast-status`);
   },
-  exportNatureTest(themeId, minutes = 60) {
+  exportNatureTest(themeId, minutes = 15) {
     return this._fetch(`/nature-live/${themeId}/export-test`, {
       method: 'POST',
       body: JSON.stringify({
@@ -439,6 +439,17 @@ const AdminClient = {
     const token = this.getToken();
     const base = `${API_BASE}/admin/nature-live/${themeId}/export-test/download`;
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  },
+  natureExportTestStreamUrl(themeId) {
+    const token = this.getToken();
+    const base = `${API_BASE}/admin/nature-live/${themeId}/export-test/stream`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  },
+  cancelNatureExport(themeId) {
+    return this._fetch(`/nature-live/${themeId}/export-test/cancel`, { method: 'POST' });
+  },
+  resetNatureExport(themeId) {
+    return this._fetch(`/nature-live/${themeId}/export-test/reset`, { method: 'POST' });
   },
   naturePreviewUrl(themeId) {
     return `${API_BASE}/admin/nature-live/${themeId}/preview`;
