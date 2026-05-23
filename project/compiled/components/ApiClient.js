@@ -446,10 +446,14 @@ const AdminClient = {
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
   },
   cancelNatureExport(themeId) {
-    return this._fetch(`/nature-live/${themeId}/export-test/cancel`, { method: 'POST' });
+    return this._fetch(`/nature-live/${themeId}/export-test/cancel`, {
+      method: 'POST'
+    });
   },
   resetNatureExport(themeId) {
-    return this._fetch(`/nature-live/${themeId}/export-test/reset`, { method: 'POST' });
+    return this._fetch(`/nature-live/${themeId}/export-test/reset`, {
+      method: 'POST'
+    });
   },
   naturePreviewUrl(themeId) {
     return `${API_BASE}/admin/nature-live/${themeId}/preview`;
