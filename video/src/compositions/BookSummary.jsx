@@ -4,9 +4,17 @@ const {
 } = require('remotion');
 const React = require('react');
 
+// Load fonts via @remotion/google-fonts — uses delayRender() internally so
+// Remotion waits for font files to arrive before rendering the first frame.
+const { loadFont: _loadDmSerif,   fontFamily: _dmSerifFamily   } = require('@remotion/google-fonts/DMSerifDisplay');
+const { loadFont: _loadJetBrains, fontFamily: _jbMonoFamily    } = require('@remotion/google-fonts/JetBrainsMono');
+
+_loadDmSerif('normal',   { subsets: ['latin'] });
+_loadJetBrains('normal', { subsets: ['latin'], weights: ['400', '600', '700', '800'] });
+
 const ACCENT = '#E8432C';
-const SERIF  = '"DM Serif Display", Georgia, serif';
-const MONO   = '"JetBrains Mono", monospace';
+const SERIF  = `"${_dmSerifFamily}", Georgia, serif`;
+const MONO   = `"${_jbMonoFamily}", monospace`;
 const TRANSITION_FRAMES = 12; // cross-fade overlap between scenes
 
 // ─── Contrast helpers ─────────────────────────────────────────
