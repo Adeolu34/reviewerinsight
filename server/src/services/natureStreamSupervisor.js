@@ -34,6 +34,16 @@ async function countLiveInDb() {
   return NatureStream.countDocuments({ status: 'live' });
 }
 
+const CONCAT_COPIES = parseInt(process.env.NATURE_CONCAT_COPIES, 10) || 500;
+
+function writeConcatPlaylist(filePath) {
+  const safePath = filePath.replace(/\\/g, '/').replace(/'/g, "'\\''");
+  const content = Array(CONCAT_COPIES).fill(`file '${safePath}'`).join('\n');
+  const playlistPath = filePath.replace(/(\.[^.]+)$/, '_playlist.txt');
+  fs.writeFileSync(playlistPath, content, 'utf8');
+  return playlistPath;
+}
+
 /**
  * Start ffmpeg RTMP encoder for a theme (expects assets + YouTube session on doc).
  */
@@ -54,12 +64,13 @@ async function startEncoder(doc, { streamStatus = 'live' } = {}) {
   const videoBitrate = process.env.NATURE_VIDEO_BITRATE || '2500k';
   const resolution = process.env.NATURE_STREAM_RESOLUTION || '1920:1080';
 
+  const videoPlaylist = writeConcatPlaylist(doc.videoPath);
+  const audioPlaylist = writeConcatPlaylist(doc.audioPath);
+
   const args = [
     '-re',
-    '-stream_loop', '-1',
-    '-i', doc.videoPath,
-    '-stream_loop', '-1',
-    '-i', doc.audioPath,
+    '-f', 'concat', '-safe', '0', '-i', videoPlaylist,
+    '-f', 'concat', '-safe', '0', '-i', audioPlaylist,
     '-map', '0:v',
     '-map', '1:a',
     '-c:v', 'libx264',
