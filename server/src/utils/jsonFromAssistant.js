@@ -8,11 +8,16 @@ function jsonFromAssistantContent(raw) {
   }
   let s = String(raw).trim();
 
-  // Strip opening fence (```json or ```) — handles both complete and truncated fences
-  s = s.replace(/^```(?:json)?\s*\r?\n?/, '');
-  // Strip closing fence if present
-  s = s.replace(/\r?\n?```\s*$/, '');
-  s = s.trim();
+  // Extract content from a fenced block if present anywhere in the response
+  // (models sometimes add prose before the code fence)
+  const fenceMatch = s.match(/```(?:json)?\s*\r?\n([\s\S]*?)(?:\r?\n```|$)/);
+  if (fenceMatch) {
+    s = fenceMatch[1].trim();
+  } else {
+    s = s.replace(/^```(?:json)?\s*\r?\n?/, '');
+    s = s.replace(/\r?\n?```\s*$/, '');
+    s = s.trim();
+  }
 
   // Find the JSON object boundaries
   const start = s.indexOf('{');

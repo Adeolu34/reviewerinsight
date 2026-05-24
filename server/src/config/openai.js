@@ -22,8 +22,8 @@ if (usingOpenRouter) {
 }
 
 const model = usingOpenRouter ? config.openrouterModel : config.openaiModel;
-/** Native json_object mode is reliable on OpenAI; Claude via OpenRouter uses prompt + fenced JSON parsing. */
-const chatJsonObjectMode = !usingOpenRouter;
+/** json_object mode is supported by OpenAI and Anthropic/Claude models via OpenRouter. */
+const chatJsonObjectMode = true;
 
 module.exports = {
   openai,

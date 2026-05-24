@@ -10,6 +10,9 @@ const logger = require('../utils/logger');
 /** themeId -> ChildProcess */
 const processes = new Map();
 
+/** themeIds being intentionally stopped — suppress auto-restart */
+const stoppingThemeIds = new Set();
+
 function ffmpegPath() {
   return process.env.FFMPEG_PATH || 'ffmpeg';
 }
@@ -63,14 +66,17 @@ async function startEncoder(doc, { streamStatus = 'live' } = {}) {
     '-preset', process.env.NATURE_FFMPEG_PRESET || 'veryfast',
     '-b:v', videoBitrate,
     '-maxrate', videoBitrate,
-    '-bufsize', '5000k',
+    '-bufsize', '8000k',
     '-vf', `scale=${resolution}:force_original_aspect_ratio=decrease,pad=${resolution}:(ow-iw)/2:(oh-ih)/2,fps=30`,
     '-pix_fmt', 'yuv420p',
     '-g', '60',
+    '-keyint_min', '60',
+    '-sc_threshold', '0',
     '-c:a', 'aac',
     '-b:a', getNatureAudioBitrate(),
     '-ar', '44100',
     '-f', 'flv',
+    '-flvflags', 'no_duration_filesize',
     rtmpUrl,
   ];
 
@@ -84,10 +90,33 @@ async function startEncoder(doc, { streamStatus = 'live' } = {}) {
   proc.on('exit', (code, signal) => {
     logger.warn(`[NatureStream] ffmpeg ${doc.themeId} exited code=${code} signal=${signal}`);
     processes.delete(doc.themeId);
+
+    if (stoppingThemeIds.has(doc.themeId)) return;
+
+    // Unexpected exit — clear pid, then restart after 3s
     NatureStream.findOneAndUpdate(
-      { themeId: doc.themeId, status: 'live' },
-      { $set: { status: 'error', lastError: `ffmpeg exited (${code || signal})`, ffmpegPid: null } },
+      { themeId: doc.themeId },
+      { $set: { ffmpegPid: null, lastError: `ffmpeg exited (${code || signal}) — restarting…` } },
     ).catch(() => {});
+
+    setTimeout(async () => {
+      if (stoppingThemeIds.has(doc.themeId)) return;
+      try {
+        const freshDoc = await NatureStream.findOne({ themeId: doc.themeId });
+        if (!freshDoc || !['live', 'preview', 'starting'].includes(freshDoc.status)) return;
+        logger.info(`[NatureStream] Auto-restarting encoder for ${doc.themeId}`);
+        await startEncoder(freshDoc, { streamStatus: freshDoc.status });
+        if (freshDoc.youtubeBroadcastId && freshDoc.status === 'live') {
+          await natureYoutube.goLive(freshDoc.youtubeBroadcastId).catch(() => {});
+        }
+      } catch (err) {
+        logger.error(`[NatureStream] Auto-restart failed ${doc.themeId}: ${err.message}`);
+        NatureStream.findOneAndUpdate(
+          { themeId: doc.themeId },
+          { $set: { status: 'error', lastError: `Auto-restart failed: ${err.message}` } },
+        ).catch(() => {});
+      }
+    }, 3000);
   });
 
   await NatureStream.findByIdAndUpdate(doc._id, {
@@ -132,6 +161,7 @@ async function startStream(themeId) {
 }
 
 async function stopEncoder(themeId, { skipYoutubeEnd = false } = {}) {
+  stoppingThemeIds.add(themeId);
   const proc = processes.get(themeId);
   if (proc && proc.exitCode === null) {
     try {
@@ -141,6 +171,7 @@ async function stopEncoder(themeId, { skipYoutubeEnd = false } = {}) {
     } catch (_) {}
   }
   processes.delete(themeId);
+  stoppingThemeIds.delete(themeId);
 
   const doc = await NatureStream.findOne({ themeId });
   if (doc && !skipYoutubeEnd && doc.youtubeBroadcastId) {
@@ -237,28 +268,50 @@ async function prepareStream(themeId) {
   }
 }
 
+async function _reconnectOrReplaceSession(doc) {
+  if (!doc.youtubeBroadcastId) return doc;
+
+  let lifecycle = null;
+  try {
+    const bcast = await natureYoutube.getBroadcastStatus(doc.youtubeBroadcastId);
+    lifecycle = bcast?.status?.lifeCycleStatus || null;
+  } catch (_) {}
+
+  if (lifecycle === 'live') {
+    // Broadcast is still live — encoder dropped but YouTube is healthy, just reconnect
+    return doc;
+  }
+
+  if (lifecycle === 'testing') {
+    // In preview — push live and reconnect
+    await natureYoutube.goLive(doc.youtubeBroadcastId).catch(() => {});
+    await NatureStream.findByIdAndUpdate(doc._id, { $set: { status: 'live' } });
+    return await NatureStream.findOne({ themeId: doc.themeId });
+  }
+
+  // Broadcast is complete/revoked/unknown — create a fresh session
+  logger.info(`[NatureStream] Broadcast ${doc.youtubeBroadcastId} lifecycle=${lifecycle} — creating new session`);
+  const session = await natureYoutube.createLiveSession({
+    title: doc.title,
+    description: doc.description,
+    tags: Array.isArray(doc.tags) ? doc.tags : [],
+  });
+  await NatureStream.findByIdAndUpdate(doc._id, { $set: session });
+  const fresh = await NatureStream.findOne({ themeId: doc.themeId });
+  await natureYoutube.goLive(fresh.youtubeBroadcastId).catch(() => {});
+  return fresh;
+}
+
 async function watchdogTick() {
   const liveDocs = await NatureStream.find({ status: { $in: ['live', 'preview'] } });
-  for (const doc of liveDocs) {
+  for (let doc of liveDocs) {
     const proc = processes.get(doc.themeId);
     const running = proc && proc.exitCode === null;
     if (!running) {
       logger.warn(`[NatureStream] Watchdog restarting ${doc.themeId}`);
       try {
-        if (doc.youtubeBroadcastId) {
-          try {
-            await natureYoutube.goLive(doc.youtubeBroadcastId);
-          } catch (_) {
-            const session = await natureYoutube.createLiveSession({
-              title: doc.title,
-              description: doc.description,
-              tags: Array.isArray(doc.tags) ? doc.tags : [],
-            });
-            await NatureStream.findByIdAndUpdate(doc._id, { $set: session });
-            doc = await NatureStream.findOne({ themeId: doc.themeId });
-          }
-        }
-        await startEncoder(doc);
+        doc = await _reconnectOrReplaceSession(doc);
+        await startEncoder(doc, { streamStatus: doc.status });
       } catch (err) {
         await NatureStream.findByIdAndUpdate(doc._id, {
           $set: { status: 'error', lastError: `Watchdog: ${err.message}` },
@@ -269,15 +322,13 @@ async function watchdogTick() {
 }
 
 async function resumeLiveOnStartup() {
-  if (process.env.NATURE_LIVE_AUTO_RESUME !== 'true') return;
-  const docs = await NatureStream.find({ status: 'live' });
-  logger.info(`[NatureStream] Auto-resume ${docs.length} stream(s)`);
-  for (const doc of docs) {
+  const docs = await NatureStream.find({ status: { $in: ['live', 'preview'] } });
+  if (!docs.length) return;
+  logger.info(`[NatureStream] Resuming ${docs.length} stream(s) on startup`);
+  for (let doc of docs) {
     try {
-      await startEncoder(doc);
-      if (doc.youtubeBroadcastId) {
-        await natureYoutube.goLive(doc.youtubeBroadcastId).catch(() => {});
-      }
+      doc = await _reconnectOrReplaceSession(doc);
+      await startEncoder(doc, { streamStatus: doc.status });
     } catch (err) {
       logger.error(`[NatureStream] Resume failed ${doc.themeId}: ${err.message}`);
     }
@@ -285,7 +336,7 @@ async function resumeLiveOnStartup() {
 }
 
 function startWatchdogCron() {
-  const intervalMs = parseInt(process.env.NATURE_WATCHDOG_INTERVAL_MS, 10) || 60000;
+  const intervalMs = parseInt(process.env.NATURE_WATCHDOG_INTERVAL_MS, 10) || 15000;
   setInterval(() => {
     watchdogTick().catch((err) => logger.error(`[NatureStream] Watchdog: ${err.message}`));
   }, intervalMs);
