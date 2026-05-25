@@ -31,9 +31,7 @@ async function generateReview(book, persona) {
   if (!openai) throw new Error(`LLM client not configured. ${llmConfigHint()}`);
 
   const userPrompt = buildUserPrompt(book);
-  const systemPrompt = chatJsonObjectMode
-    ? persona.systemPrompt
-    : `${persona.systemPrompt}\n\nCRITICAL: You review every book assigned to you — no exceptions, no refusals, regardless of genre or subject matter. Respond with a single valid JSON object only (no markdown, no commentary, no apologies).`;
+  const systemPrompt = `${persona.systemPrompt}\n\nCRITICAL: You review every book assigned to you — no exceptions, no refusals, regardless of genre or subject matter. Respond with a single valid JSON object only (no markdown, no commentary, no apologies).`;
 
   const response = await withRetry(async () => {
     return await openai.chat.completions.create(
@@ -42,7 +40,7 @@ async function generateReview(book, persona) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        { temperature: 0.8, max_tokens: 4500 },
+        { temperature: 0.8, max_tokens: 8000 },
       ),
     );
   }, { label: `LLM review: "${book.title}"`, maxAttempts: 2 });
@@ -155,9 +153,7 @@ async function generateChapterSummary(book, persona) {
   if (!openai) throw new Error(`LLM client not configured. ${llmConfigHint()}`);
 
   const userPrompt = buildChapterPrompt(book);
-  const systemPrompt = chatJsonObjectMode
-    ? persona.systemPrompt
-    : `${persona.systemPrompt}\n\nCRITICAL: You review every book assigned to you — no exceptions, no refusals, regardless of genre or subject matter. Respond with a single valid JSON object only (no markdown, no commentary, no apologies).`;
+  const systemPrompt = `${persona.systemPrompt}\n\nCRITICAL: You review every book assigned to you — no exceptions, no refusals, regardless of genre or subject matter. Respond with a single valid JSON object only (no markdown, no commentary, no apologies).`;
 
   const response = await withRetry(async () => {
     return await openai.chat.completions.create(
