@@ -120,6 +120,7 @@ router.get('/youtube/auth-url', async (req, res, next) => {
       access_type: 'offline',
       scope:       footballYoutube.LIVE_SCOPES,
       prompt:      'consent',
+      state:       'football',
     });
     res.json({ authUrl, redirectUri });
   } catch (err) { next(err); }

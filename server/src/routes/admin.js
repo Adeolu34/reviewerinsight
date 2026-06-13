@@ -66,14 +66,23 @@ router.post('/login', async (req, res) => {
 });
 
 // ─── GET /api/admin/youtube/callback (PUBLIC — Google redirects here) ──────────
+// Handles book-review YouTube AND football YouTube via state param:
+//   state=football  → stores token as football_youtube_refresh_token
+//   (default)       → stores token as youtube_refresh_token
 router.get('/youtube/callback', async (req, res) => {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
+  const isFootball = state === 'football';
+
+  const successEvent = isFootball ? 'football-youtube-connected' : 'youtube-connected';
+  const errorPrefix  = isFootball ? 'football-youtube-error'     : 'youtube-error';
+  const tokenKey     = isFootball ? 'football_youtube_refresh_token' : 'youtube_refresh_token';
+  const label        = isFootball ? 'Football YouTube' : 'YouTube';
 
   const page = (ok, msg) => res.send(`<!DOCTYPE html><html>
-<head><title>YouTube ${ok ? 'Connected' : 'Error'}</title></head>
+<head><title>${label} ${ok ? 'Connected' : 'Error'}</title></head>
 <body style="font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#eee">
 <script>
-if(window.opener){window.opener.postMessage(${JSON.stringify(ok ? 'youtube-connected' : `youtube-error:${msg}`)},\'*\');window.close();}
+if(window.opener){window.opener.postMessage(${JSON.stringify(ok ? successEvent : `${errorPrefix}:${msg}`)},\'*\');window.close();}
 else{document.body.innerHTML='<h2 style="color:${ok ? '#10B981' : '#EF4444'}">${ok ? 'Connected! You can close this tab.' : 'Error: ' + msg}</h2>';}
 </script>
 </body></html>`);
@@ -102,14 +111,14 @@ else{document.body.innerHTML='<h2 style="color:${ok ? '#10B981' : '#EF4444'}">${
       return page(false, 'No refresh_token returned — revoke app access in Google and try again');
     }
     await AppSetting.findOneAndUpdate(
-      { key: 'youtube_refresh_token' },
+      { key: tokenKey },
       { $set: { value: tokens.refresh_token } },
       { upsert: true }
     );
-    logger.info('[YouTube] Refresh token saved to database via OAuth callback');
+    logger.info(`[${label}] Refresh token saved to database via OAuth callback`);
     return page(true, 'connected');
   } catch (err) {
-    logger.error(`[YouTube] OAuth callback failed: ${err.message}`);
+    logger.error(`[${label}] OAuth callback failed: ${err.message}`);
     return page(false, err.message.slice(0, 120));
   }
 });

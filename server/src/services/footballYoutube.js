@@ -16,12 +16,14 @@ async function _getRefreshToken() {
   return setting?.value || null;
 }
 
+// Football OAuth reuses the main /api/admin/youtube/callback with state=football
+// so only one redirect URI needs to be registered in Google Cloud Console.
 function getRedirectUri(req) {
-  const explicit = process.env.FOOTBALL_YOUTUBE_REDIRECT_URI?.trim();
+  const explicit = process.env.YOUTUBE_REDIRECT_URI?.trim();
   if (explicit) return explicit;
   if (req) {
     const proto = (req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
-    return `${proto}://${req.get('host')}${CALLBACK_PATH}`;
+    return `${proto}://${req.get('host')}/api/admin/youtube/callback`;
   }
   return 'urn:ietf:wg:oauth:2.0:oob';
 }
