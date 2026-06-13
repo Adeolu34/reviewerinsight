@@ -5136,6 +5136,652 @@ const NatureLiveSection = () => {
     setBusy: setBusy
   })))), /*#__PURE__*/React.createElement(NatureYoutubeConnectionCard, null));
 };
+
+// ─── SECTION: Football Live ──────────────────────────────────────
+const FOOTBALL_STATUS_COLORS = {
+  idle: T.dim,
+  starting: T.warn,
+  preview: T.info,
+  live: T.ok,
+  error: T.err,
+  stopped: T.muted
+};
+const FootballYoutubeConnectionCard = () => {
+  const [status, setStatus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState('');
+  const loadStatus = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await AdminClient.getFootballLiveStatus();
+      setStatus(data.youtube);
+    } catch (e) {
+      setStatus(null);
+    }
+    setLoading(false);
+  }, []);
+  React.useEffect(() => {
+    loadStatus();
+    const handler = e => {
+      if (e.data === 'football-youtube-connected') {
+        setMsg('');
+        loadStatus();
+      } else if (typeof e.data === 'string' && e.data.startsWith('football-youtube-error:')) {
+        setMsg('✗ ' + e.data.slice('football-youtube-error:'.length));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+  const handleConnect = async () => {
+    setMsg('');
+    try {
+      const {
+        authUrl
+      } = await AdminClient.getFootballYoutubeAuthUrl();
+      window.open(authUrl, 'football-youtube-auth', 'width=560,height=680,resizable=yes');
+    } catch (e) {
+      setMsg('✗ ' + e.message);
+    }
+  };
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Football YouTube channel?')) return;
+    try {
+      await AdminClient.disconnectFootballYoutube();
+      setMsg('Disconnected.');
+      loadStatus();
+    } catch (e) {
+      setMsg('✗ ' + e.message);
+    }
+  };
+  return /*#__PURE__*/React.createElement(Card, {
+    title: "Football YouTube (separate channel)"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontFamily: T.sans,
+      color: T.muted,
+      marginBottom: 12,
+      lineHeight: 1.5
+    }
+  }, "Use a ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "different Google account"), " than book-review Videos and Nature Live. Sign in with your football channel when connecting."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontFamily: T.sans,
+      color: T.warn,
+      marginBottom: 12,
+      lineHeight: 1.5,
+      padding: 10,
+      borderRadius: 6,
+      background: `${T.warn}15`
+    }
+  }, "YouTube must ", /*#__PURE__*/React.createElement("strong", null, "approve live streaming"), " on this channel first (Studio \u2192 Create \u2192 Go live once, verify phone, up to 24h)."), loading ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 12,
+      color: T.muted
+    }
+  }, "Checking\u2026") : !status?.clientConfigured ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: T.warn
+    }
+  }, "Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in environment.") : status?.connected ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 13,
+      color: T.ok
+    }
+  }, "\u2713 ", status.channelName || 'Connected'), status.channelId && /*#__PURE__*/React.createElement("a", {
+    href: `https://youtube.com/channel/${status.channelId}`,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      fontSize: 11,
+      color: T.dim
+    }
+  }, "channel \u2197"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "danger",
+    onClick: handleDisconnect
+  }, "Disconnect")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: T.muted,
+      marginBottom: 8,
+      fontFamily: T.mono
+    }
+  }, "Redirect: ", status?.redirectUri || '…'), /*#__PURE__*/React.createElement(Btn, {
+    variant: "primary",
+    onClick: handleConnect
+  }, "Connect Football Channel")), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: msg.startsWith('✗') ? T.err : T.ok
+    }
+  }, msg));
+};
+const FootballSection = () => {
+  const [busy, setBusy] = React.useState(false);
+  const [poll, setPoll] = React.useState(0);
+  const [localMsg, setLocalMsg] = React.useState('');
+  const [editing, setEditing] = React.useState(false);
+  const [editFields, setEditFields] = React.useState({
+    title: '',
+    description: '',
+    tags: '',
+    categoryId: '17'
+  });
+  const [uploadProgress, setUploadProgress] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+  const {
+    data,
+    loading,
+    error,
+    refresh
+  } = useAdminApi(() => AdminClient.getFootballLiveStatus(), [poll]);
+  React.useEffect(() => {
+    const stream = data?.stream;
+    if (stream && !editing) {
+      setEditFields({
+        title: stream.title || '',
+        description: stream.description || '',
+        tags: Array.isArray(stream.tags) ? stream.tags.join(', ') : '',
+        categoryId: stream.categoryId || '17'
+      });
+    }
+  }, [data]);
+  React.useEffect(() => {
+    const st = data?.stream?.status;
+    if (['starting', 'preview'].includes(st)) {
+      const t = setInterval(() => setPoll(p => p + 1), 5000);
+      return () => clearInterval(t);
+    }
+  }, [data?.stream?.status]);
+  const act = async (fn, label) => {
+    setBusy(true);
+    setLocalMsg('');
+    try {
+      await fn();
+      setLocalMsg(`✓ ${label}`);
+      refresh();
+    } catch (e) {
+      setLocalMsg('✗ ' + e.message);
+    }
+    setBusy(false);
+  };
+  const handleSaveMeta = async () => {
+    await act(async () => {
+      await AdminClient.updateFootballStream({
+        title: editFields.title.trim(),
+        description: editFields.description.trim(),
+        tags: editFields.tags.split(',').map(t => t.trim()).filter(Boolean),
+        categoryId: editFields.categoryId
+      });
+      setEditing(false);
+    }, 'Saved');
+  };
+  const handleUpload = async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.mp4')) {
+      setLocalMsg('✗ Only .mp4 files are supported');
+      return;
+    }
+    setLocalMsg('');
+    setUploadProgress(0);
+    try {
+      const result = await AdminClient.uploadFootballVideo(file, pct => setUploadProgress(pct));
+      setUploadProgress(null);
+      setLocalMsg(`✓ Uploaded ${(result.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`);
+      refresh();
+    } catch (err) {
+      setUploadProgress(null);
+      setLocalMsg('✗ ' + err.message);
+    }
+    e.target.value = '';
+  };
+  const stream = data?.stream || {};
+  const st = stream.status || 'idle';
+  const color = FOOTBALL_STATUS_COLORS[st] || T.dim;
+  const studioUrl = stream.youtubeStudioUrl || (stream.youtubeBroadcastId ? `https://studio.youtube.com/video/${stream.youtubeBroadcastId}/livestreaming` : null);
+  const isActive = ['live', 'preview', 'starting'].includes(st);
+  const YOUTUBE_CATEGORIES = [{
+    id: '17',
+    label: 'Sports'
+  }, {
+    id: '22',
+    label: 'People & Blogs'
+  }, {
+    id: '10',
+    label: 'Music'
+  }, {
+    id: '24',
+    label: 'Entertainment'
+  }, {
+    id: '25',
+    label: 'News & Politics'
+  }, {
+    id: '28',
+    label: 'Science & Technology'
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontFamily: T.serif,
+      fontSize: 32,
+      margin: 0
+    }
+  }, "Football Live"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 13,
+      color: T.muted,
+      marginTop: 8,
+      maxWidth: 640,
+      lineHeight: 1.6
+    }
+  }, "Workflow: ", /*#__PURE__*/React.createElement("strong", null, "Upload video"), " \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Set title & tags"), " \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Prepare"), " (YouTube preview) \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Go live"), ". Streams ", /*#__PURE__*/React.createElement("code", null, "mynewstream.mp4"), " on a loop 24/7.")), /*#__PURE__*/React.createElement(Btn, {
+    variant: "danger",
+    disabled: busy || !isActive,
+    onClick: () => act(() => AdminClient.stopFootballStream(), 'Stopped')
+  }, "Stop stream")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 16,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement(Metric, {
+    label: "Status",
+    value: st.toUpperCase()
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Encoder",
+    value: data?.stream?.encoderRunning ? 'Running' : 'Stopped'
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "Video file",
+    value: data?.videoExists ? `${(data.videoBytes / 1024 / 1024 / 1024).toFixed(2)} GB` : 'Not found'
+  }), /*#__PURE__*/React.createElement(Metric, {
+    label: "YouTube",
+    value: data?.youtube?.connected ? data.youtube.channelName || 'Connected' : 'Not connected'
+  })), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 12,
+      borderRadius: 8,
+      background: `${T.err}20`,
+      color: T.err,
+      fontFamily: T.mono,
+      fontSize: 12
+    }
+  }, error.message), /*#__PURE__*/React.createElement(Card, {
+    title: "Stream"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 16,
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 11,
+      color,
+      textTransform: 'uppercase',
+      letterSpacing: '.1em',
+      background: `${color}18`,
+      padding: '3px 8px',
+      borderRadius: 4
+    }
+  }, st), stream.youtubeLifeCycle && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 10,
+      color: T.dim
+    }
+  }, "YouTube: ", stream.youtubeLifeCycle), stream.lastError && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 11,
+      color: T.err,
+      wordBreak: 'break-word'
+    }
+  }, stream.lastError)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "Stream settings"), !editing ? /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => setEditing(true)
+  }, "Edit") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    disabled: busy,
+    onClick: handleSaveMeta
+  }, "Save"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => {
+      setEditing(false);
+    }
+  }, "Cancel"))), editing ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 11,
+      color: T.muted,
+      display: 'block',
+      marginBottom: 4
+    }
+  }, "Title"), /*#__PURE__*/React.createElement("input", {
+    value: editFields.title,
+    onChange: e => setEditFields(f => ({
+      ...f,
+      title: e.target.value
+    })),
+    placeholder: "Football Live 24/7",
+    maxLength: 100,
+    style: {
+      width: '100%',
+      background: T.bg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 6,
+      padding: '8px 10px',
+      color: T.text,
+      fontFamily: T.sans,
+      fontSize: 13,
+      boxSizing: 'border-box'
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 11,
+      color: T.muted,
+      display: 'block',
+      marginBottom: 4
+    }
+  }, "Description"), /*#__PURE__*/React.createElement("textarea", {
+    value: editFields.description,
+    onChange: e => setEditFields(f => ({
+      ...f,
+      description: e.target.value
+    })),
+    rows: 4,
+    maxLength: 5000,
+    placeholder: "Live football stream 24/7\u2026",
+    style: {
+      width: '100%',
+      background: T.bg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 6,
+      padding: '8px 10px',
+      color: T.text,
+      fontFamily: T.sans,
+      fontSize: 13,
+      resize: 'vertical',
+      boxSizing: 'border-box'
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 11,
+      color: T.muted,
+      display: 'block',
+      marginBottom: 4
+    }
+  }, "Tags (comma-separated)"), /*#__PURE__*/React.createElement("input", {
+    value: editFields.tags,
+    onChange: e => setEditFields(f => ({
+      ...f,
+      tags: e.target.value
+    })),
+    placeholder: "football, live stream, sports",
+    style: {
+      width: '100%',
+      background: T.bg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 6,
+      padding: '8px 10px',
+      color: T.text,
+      fontFamily: T.sans,
+      fontSize: 13,
+      boxSizing: 'border-box'
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 11,
+      color: T.muted,
+      display: 'block',
+      marginBottom: 4
+    }
+  }, "Category"), /*#__PURE__*/React.createElement("select", {
+    value: editFields.categoryId,
+    onChange: e => setEditFields(f => ({
+      ...f,
+      categoryId: e.target.value
+    })),
+    style: {
+      background: T.bg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 6,
+      padding: '8px 10px',
+      color: T.text,
+      fontFamily: T.sans,
+      fontSize: 13
+    }
+  }, YOUTUBE_CATEGORIES.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.id
+  }, c.label))))) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontFamily: T.mono,
+      color: T.muted,
+      lineHeight: 1.6
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Title:"), " ", stream.title || /*#__PURE__*/React.createElement("em", null, "not set")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Description:"), " ", stream.description ? stream.description.slice(0, 120) + (stream.description.length > 120 ? '…' : '') : /*#__PURE__*/React.createElement("em", null, "not set")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Tags:"), " ", Array.isArray(stream.tags) && stream.tags.length ? stream.tags.join(', ') : /*#__PURE__*/React.createElement("em", null, "none")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: T.text
+    }
+  }, "Category:"), " ", YOUTUBE_CATEGORIES.find(c => c.id === stream.categoryId)?.label || 'Sports'))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16,
+      padding: 12,
+      borderRadius: 8,
+      background: `${T.bg}`,
+      border: `1px solid ${T.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.sans,
+      fontSize: 13,
+      fontWeight: 600,
+      marginBottom: 4
+    }
+  }, "Video file"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 11,
+      color: T.muted
+    }
+  }, data?.videoPath || '…'), data?.videoExists ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 11,
+      color: T.ok,
+      marginTop: 2
+    }
+  }, "\u2713 ", (data.videoBytes / 1024 / 1024 / 1024).toFixed(2), " GB on server") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 11,
+      color: T.err,
+      marginTop: 2
+    }
+  }, "\u2717 File not found \u2014 upload below")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRef,
+    type: "file",
+    accept: ".mp4,video/mp4",
+    style: {
+      display: 'none'
+    },
+    onChange: handleUpload
+  }), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    disabled: uploadProgress !== null,
+    onClick: () => fileInputRef.current?.click()
+  }, uploadProgress !== null ? `Uploading ${uploadProgress}%…` : 'Upload video ↑'), uploadProgress !== null && /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 160,
+      height: 4,
+      background: T.border,
+      borderRadius: 2
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: `${uploadProgress}%`,
+      height: '100%',
+      background: T.accent,
+      borderRadius: 2,
+      transition: 'width .3s'
+    }
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    disabled: busy || !data?.videoExists || isActive,
+    onClick: () => act(() => AdminClient.prepareFootballStream(), 'Preparing YouTube preview…'),
+    title: !data?.videoExists ? 'Upload video first' : isActive ? 'Already running' : ''
+  }, "1. Prepare (YT preview)"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "primary",
+    disabled: busy || st !== 'preview' && st !== 'starting',
+    onClick: () => act(() => AdminClient.goLiveFootballStream(), 'Now live')
+  }, "2. Go live"), /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "danger",
+    disabled: busy || !isActive,
+    onClick: () => act(() => AdminClient.stopFootballStream(), 'Stopped')
+  }, "Stop"), studioUrl && isActive && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => window.open(studioUrl, '_blank')
+  }, "Studio \u2197"), stream.youtubeWatchUrl && ['preview', 'live'].includes(st) && /*#__PURE__*/React.createElement(Btn, {
+    small: true,
+    variant: "ghost",
+    onClick: () => window.open(stream.youtubeWatchUrl, '_blank')
+  }, "Watch \u2197"), loading && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: T.mono,
+      fontSize: 11,
+      color: T.muted,
+      alignSelf: 'center'
+    }
+  }, "Refreshing\u2026")), localMsg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 11,
+      fontFamily: T.mono,
+      color: localMsg.startsWith('✗') ? T.err : T.ok
+    }
+  }, localMsg)), /*#__PURE__*/React.createElement(FootballYoutubeConnectionCard, null));
+};
 const SECTIONS = [{
   id: 'overview',
   label: 'Overview',
@@ -5160,6 +5806,10 @@ const SECTIONS = [{
   id: 'nature-live',
   label: 'Nature Live',
   icon: '◎'
+}, {
+  id: 'football',
+  label: 'Football',
+  icon: '⬡'
 }, {
   id: 'scraper',
   label: 'Scraper',
@@ -5205,6 +5855,7 @@ const Admin = ({
     authors: AuthorsSection,
     videos: VideosSection,
     'nature-live': NatureLiveSection,
+    football: FootballSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,
