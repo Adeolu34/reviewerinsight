@@ -310,6 +310,40 @@ const AdminClient = {
   stopNatureStream(themeId) { return this._fetch(`/nature-live/${themeId}/stop`, { method: 'POST' }); },
   stopAllNatureStreams() { return this._fetch('/nature-live/stop-all', { method: 'POST' }); },
 
+  // Football Live (separate YouTube channel)
+  getFootballLiveStatus()   { return this._fetch('/football-live/status'); },
+  getFootballYoutubeAuthUrl() { return this._fetch('/football-live/youtube/auth-url'); },
+  disconnectFootballYoutube() { return this._fetch('/football-live/youtube/disconnect', { method: 'DELETE' }); },
+  updateFootballStream(data) {
+    return this._fetch('/football-live/stream', { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  prepareFootballStream() { return this._fetch('/football-live/prepare', { method: 'POST' }); },
+  goLiveFootballStream()  { return this._fetch('/football-live/go-live', { method: 'POST' }); },
+  startFootballStream()   { return this._fetch('/football-live/start', { method: 'POST' }); },
+  stopFootballStream()    { return this._fetch('/football-live/stop', { method: 'POST' }); },
+  getFootballBroadcastStatus() { return this._fetch('/football-live/broadcast-status'); },
+  uploadFootballVideo(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/admin/football-live/upload-video`);
+      xhr.setRequestHeader('Authorization', `Bearer ${this.getToken()}`);
+      xhr.setRequestHeader('Content-Type', 'video/mp4');
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({}); }
+        } else {
+          try { reject(new Error(JSON.parse(xhr.responseText).error || `Upload failed (${xhr.status})`)); }
+          catch { reject(new Error(`Upload failed (${xhr.status})`)); }
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.send(file);
+    });
+  },
+
   // Videos
   getVideoStats()                    { return this._fetch('/video-stats'); },
   getVideos(params = {})             { return this._fetch(`/videos?${new URLSearchParams(params)}`); },

@@ -8,7 +8,8 @@ const { generateVideoScript }  = require('../services/videoScript');
 const { generateSpeechFile }   = require('../services/elevenLabs');
 const { generateCaptionsFromScript } = require('../services/captionService');
 const { uploadVideo, isConfigured: youtubeConfigured } = require('../services/youtube');
-const logger   = require('../utils/logger');
+const logger      = require('../utils/logger');
+const llmCredits  = require('../utils/llmCredits');
 
 const VIDEO_OUTPUT_DIR = process.env.VIDEO_OUTPUT_DIR
   || path.join(__dirname, '..', '..', '..', 'videos');
@@ -26,6 +27,12 @@ class VideoAgent {
    * Creates/updates a VideoJob document and returns the job.
    */
   async generateForBook(bookId) {
+    if (llmCredits.isPaused()) {
+      const reason = llmCredits.pauseReason();
+      logger.warn(`[VideoAgent] Skipping "${bookId}" — ${reason}`);
+      throw new Error(reason);
+    }
+
     const book = await Book.findById(bookId).lean();
     if (!book) throw new Error(`Book not found: ${bookId}`);
     if (book.status !== 'published') throw new Error(`Book "${book.title}" is not published (status: ${book.status})`);
@@ -134,6 +141,7 @@ class VideoAgent {
       return await VideoJob.findById(job._id);
 
     } catch (err) {
+      llmCredits.noteFailure(err);
       const step = (await VideoJob.findById(job._id))?.status || 'unknown';
       await job.updateOne({ status:'failed', error: err.message, errorStep: step });
       logger.error(`[VideoAgent] Failed at step "${step}": ${err.message}`);
@@ -163,6 +171,11 @@ class VideoAgent {
    * Find the next N books with completed reviews but no video, and generate them.
    */
   async runBatch(batchSize = 5) {
+    if (llmCredits.isPaused()) {
+      logger.warn(`[VideoAgent] Batch skipped — ${llmCredits.pauseReason()}`);
+      return [];
+    }
+
     if (this._running) {
       logger.warn('[VideoAgent] Already running, skipping');
       return [];

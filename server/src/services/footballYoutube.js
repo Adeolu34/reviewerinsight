@@ -1,10 +1,8 @@
 const { google } = require('googleapis');
-const config = require('../config/env');
 const logger = require('../utils/logger');
 
-const NATURE_CALLBACK_PATH = '/api/admin/nature-live/youtube/callback';
-
-const REFRESH_TOKEN_KEY = 'nature_youtube_refresh_token';
+const CALLBACK_PATH     = '/api/admin/football-live/youtube/callback';
+const REFRESH_TOKEN_KEY = 'football_youtube_refresh_token';
 
 const LIVE_SCOPES = [
   'https://www.googleapis.com/auth/youtube',
@@ -12,30 +10,19 @@ const LIVE_SCOPES = [
 ];
 
 async function _getRefreshToken() {
-  if (process.env.NATURE_YOUTUBE_REFRESH_TOKEN) return process.env.NATURE_YOUTUBE_REFRESH_TOKEN;
+  if (process.env.FOOTBALL_YOUTUBE_REFRESH_TOKEN) return process.env.FOOTBALL_YOUTUBE_REFRESH_TOKEN;
   const AppSetting = require('../models/AppSetting');
   const setting = await AppSetting.findOne({ key: REFRESH_TOKEN_KEY });
   return setting?.value || null;
 }
 
 function getRedirectUri(req) {
-  const explicit = process.env.NATURE_YOUTUBE_REDIRECT_URI?.trim();
+  const explicit = process.env.FOOTBALL_YOUTUBE_REDIRECT_URI?.trim();
   if (explicit) return explicit;
-
-  const bookUri = process.env.YOUTUBE_REDIRECT_URI?.trim();
-  if (bookUri?.includes('/api/admin/youtube/callback')) {
-    return bookUri.replace('/api/admin/youtube/callback', NATURE_CALLBACK_PATH);
-  }
-
-  if (config.siteUrl) {
-    return `${config.siteUrl}${NATURE_CALLBACK_PATH}`;
-  }
-
   if (req) {
     const proto = (req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
-    return `${proto}://${req.get('host')}${NATURE_CALLBACK_PATH}`;
+    return `${proto}://${req.get('host')}${CALLBACK_PATH}`;
   }
-
   return 'urn:ietf:wg:oauth:2.0:oob';
 }
 
@@ -54,7 +41,7 @@ async function isConfigured() {
 
 async function getClient() {
   const token = await _getRefreshToken();
-  if (!token) throw new Error('Nature YouTube refresh token not configured');
+  if (!token) throw new Error('Football YouTube refresh token not configured');
   const auth = createOAuth2Client(getRedirectUri());
   auth.setCredentials({ refresh_token: token });
   return auth;
@@ -62,40 +49,31 @@ async function getClient() {
 
 async function getChannelInfo() {
   const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
-  const ch = await yt.channels.list({ part: ['snippet'], mine: true });
+  const yt   = google.youtube({ version: 'v3', auth });
+  const ch   = await yt.channels.list({ part: ['snippet'], mine: true });
   const item = ch.data.items?.[0];
-  return {
-    channelName: item?.snippet?.title || null,
-    channelId: item?.id || null,
-  };
+  return { channelName: item?.snippet?.title || null, channelId: item?.id || null };
 }
 
-/**
- * Create liveStream + liveBroadcast, bind, return ingest details.
- */
-async function createLiveSession({ title, description, tags = [] }) {
+async function createLiveSession({ title, description = '', tags = [], categoryId = '17', privacyStatus = 'public' }) {
   const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
+  const yt   = google.youtube({ version: 'v3', auth });
 
   const streamRes = await yt.liveStreams.insert({
     part: ['snippet', 'cdn', 'status'],
     requestBody: {
-      snippet: { title: title.slice(0, 128), description: description?.slice(0, 5000) || '' },
-      cdn: {
-        frameRate: '30fps',
-        ingestionType: 'rtmp',
-        resolution: '1080p',
-      },
+      snippet: { title: title.slice(0, 128), description: description.slice(0, 5000) },
+      cdn: { frameRate: '30fps', ingestionType: 'rtmp', resolution: '1080p' },
       status: { streamStatus: 'active' },
     },
   });
 
-  const stream = streamRes.data;
-  const streamId = stream.id;
+  const stream           = streamRes.data;
+  const streamId         = stream.id;
   const ingestionAddress = stream.cdn?.ingestionInfo?.ingestionAddress;
-  const streamName = stream.cdn?.ingestionInfo?.streamName;
-  if (!ingestionAddress || !streamName) {
+  const streamKey        = stream.cdn?.ingestionInfo?.streamName;
+
+  if (!ingestionAddress || !streamKey) {
     throw new Error('YouTube did not return RTMP ingestion details');
   }
 
@@ -105,17 +83,17 @@ async function createLiveSession({ title, description, tags = [] }) {
     requestBody: {
       snippet: {
         title: title.slice(0, 100),
-        description: description?.slice(0, 5000) || '',
+        description: description.slice(0, 5000),
         scheduledStartTime: start.toISOString(),
       },
       status: {
-        privacyStatus: process.env.NATURE_YOUTUBE_PRIVACY || 'public',
+        privacyStatus: process.env.FOOTBALL_YOUTUBE_PRIVACY || privacyStatus,
         selfDeclaredMadeForKids: false,
       },
       contentDetails: {
         enableAutoStart: false,
-        enableAutoStop: false,
-        monitorStream: { enableMonitorStream: true },
+        enableAutoStop:  false,
+        monitorStream:   { enableMonitorStream: true },
       },
     },
   });
@@ -136,85 +114,57 @@ async function createLiveSession({ title, description, tags = [] }) {
           id: broadcastId,
           snippet: {
             title: title.slice(0, 100),
-            description: description?.slice(0, 5000) || '',
+            description: description.slice(0, 5000),
             tags: tags.slice(0, 500),
-            categoryId: '22', // People & Blogs — closest for ambient/chill live
+            categoryId: String(categoryId),
           },
         },
       });
-      logger.info(`[NatureYouTube] Tags set on broadcast ${broadcastId}`);
     } catch (err) {
-      logger.warn(`[NatureYouTube] Could not set tags: ${err.message}`);
+      logger.warn(`[FootballYouTube] Could not set tags: ${err.message}`);
     }
   }
 
-  const watchUrl = `https://www.youtube.com/watch?v=${broadcastId}`;
-  const studioUrl = `https://studio.youtube.com/video/${broadcastId}/livestreaming`;
+  const youtubeWatchUrl  = `https://www.youtube.com/watch?v=${broadcastId}`;
+  const youtubeStudioUrl = `https://studio.youtube.com/video/${broadcastId}/livestreaming`;
 
-  logger.info(`[NatureYouTube] Live session created broadcast=${broadcastId} stream=${streamId}`);
+  logger.info(`[FootballYouTube] Live session created broadcast=${broadcastId} stream=${streamId}`);
+  return { youtubeBroadcastId: broadcastId, youtubeStreamId: streamId, ingestionAddress, streamKey, youtubeWatchUrl, youtubeStudioUrl };
+}
 
-  return {
-    youtubeBroadcastId: broadcastId,
-    youtubeStreamId: streamId,
-    ingestionAddress,
-    streamKey: streamName,
-    youtubeWatchUrl: watchUrl,
-    youtubeStudioUrl: studioUrl,
-  };
+async function transitionBroadcast(broadcastId, status) {
+  const auth = await getClient();
+  const yt   = google.youtube({ version: 'v3', auth });
+  await yt.liveBroadcasts.transition({ id: broadcastId, broadcastStatus: status, part: ['status'] });
+  logger.info(`[FootballYouTube] Broadcast ${broadcastId} → ${status}`);
 }
 
 async function enterPreviewMode(broadcastId) {
   await transitionBroadcast(broadcastId, 'testing');
 }
 
-async function transitionBroadcast(broadcastId, status) {
-  const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
-  await yt.liveBroadcasts.transition({
-    id: broadcastId,
-    broadcastStatus: status,
-    part: ['status'],
-  });
-  logger.info(`[NatureYouTube] Broadcast ${broadcastId} → ${status}`);
-}
-
 async function goLive(broadcastId) {
-  try {
-    await transitionBroadcast(broadcastId, 'testing');
-  } catch (err) {
-    logger.warn(`[NatureYouTube] testing transition skipped: ${err.message}`);
-  }
+  try { await transitionBroadcast(broadcastId, 'testing'); } catch (_) {}
   await transitionBroadcast(broadcastId, 'live');
 }
 
 async function endBroadcast(broadcastId) {
   if (!broadcastId) return;
-  try {
-    await transitionBroadcast(broadcastId, 'complete');
-  } catch (err) {
-    logger.warn(`[NatureYouTube] endBroadcast: ${err.message}`);
+  try { await transitionBroadcast(broadcastId, 'complete'); } catch (err) {
+    logger.warn(`[FootballYouTube] endBroadcast: ${err.message}`);
   }
 }
 
 async function getBroadcastStatus(broadcastId) {
   const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
-  const res = await yt.liveBroadcasts.list({
-    part: ['status', 'snippet'],
-    id: [broadcastId],
-  });
+  const yt   = google.youtube({ version: 'v3', auth });
+  const res  = await yt.liveBroadcasts.list({ part: ['status', 'snippet'], id: [broadcastId] });
   return res.data.items?.[0] || null;
 }
 
-/**
- * Update the title, description, tags, or category on an existing broadcast (video).
- * Safe to call while the stream is live.
- */
 async function updateBroadcastMetadata(broadcastId, { title, description, tags, categoryId } = {}) {
-  const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
-
-  // Fetch current snippet so we can do a partial update
+  const auth    = await getClient();
+  const yt      = google.youtube({ version: 'v3', auth });
   const current = await yt.videos.list({ part: ['snippet'], id: [broadcastId] });
   const snippet = current.data.items?.[0]?.snippet;
   if (!snippet) throw new Error(`Broadcast ${broadcastId} not found`);
@@ -227,41 +177,24 @@ async function updateBroadcastMetadata(broadcastId, { title, description, tags, 
     ...(categoryId !== undefined  && { categoryId: String(categoryId) }),
   };
 
-  await yt.videos.update({
-    part: ['snippet'],
-    requestBody: { id: broadcastId, snippet: updated },
-  });
-
-  logger.info(`[NatureYouTube] Broadcast ${broadcastId} metadata updated`);
+  await yt.videos.update({ part: ['snippet'], requestBody: { id: broadcastId, snippet: updated } });
+  logger.info(`[FootballYouTube] Broadcast ${broadcastId} metadata updated`);
 }
 
-/**
- * Fetch current channel branding/snippet/statistics.
- */
 async function getChannel() {
-  if (!(await isConfigured())) throw new Error('Nature YouTube credentials not configured');
+  if (!(await isConfigured())) throw new Error('Football YouTube credentials not configured');
   const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
-
-  const res = await yt.channels.list({
-    part: ['snippet', 'brandingSettings', 'statistics'],
-    mine: true,
-  });
+  const yt   = google.youtube({ version: 'v3', auth });
+  const res  = await yt.channels.list({ part: ['snippet', 'brandingSettings', 'statistics'], mine: true });
   const channel = res.data.items?.[0];
   if (!channel) throw new Error('No YouTube channel found');
   return channel;
 }
 
-/**
- * Update channel branding settings.
- * @param {Object} opts - title, description, keywords[], country, defaultLanguage,
- *                        unsubscribedTrailer, featuredChannelsUrls[], featuredChannelsTitle
- */
 async function updateChannel(opts = {}) {
-  if (!(await isConfigured())) throw new Error('Nature YouTube credentials not configured');
-  const auth = await getClient();
-  const yt = google.youtube({ version: 'v3', auth });
-
+  if (!(await isConfigured())) throw new Error('Football YouTube credentials not configured');
+  const auth    = await getClient();
+  const yt      = google.youtube({ version: 'v3', auth });
   const current = await getChannel();
   const existing = current.brandingSettings || {};
   const channel  = { ...existing.channel };
@@ -279,23 +212,17 @@ async function updateChannel(opts = {}) {
     part: ['brandingSettings'],
     requestBody: { id: current.id, brandingSettings: { ...existing, channel } },
   });
-
-  logger.info(`[NatureYouTube] Channel settings updated (${current.id})`);
+  logger.info(`[FootballYouTube] Channel settings updated (${current.id})`);
   return res.data;
 }
 
-/**
- * Upload a channel banner image (JPEG or PNG, min 2048x1152px recommended, max 10 MB).
- * @param {string} filePath - absolute path to image file
- */
 async function uploadChannelBanner(filePath) {
   const fs = require('fs');
-  if (!(await isConfigured())) throw new Error('Nature YouTube credentials not configured');
+  if (!(await isConfigured())) throw new Error('Football YouTube credentials not configured');
   if (!fs.existsSync(filePath)) throw new Error(`Banner file not found: ${filePath}`);
 
-  const auth = await getClient();
-  const yt   = google.youtube({ version: 'v3', auth });
-
+  const auth     = await getClient();
+  const yt       = google.youtube({ version: 'v3', auth });
   const ext      = filePath.split('.').pop().toLowerCase();
   const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
 
@@ -304,10 +231,9 @@ async function uploadChannelBanner(filePath) {
     requestBody: {},
     media: { mimeType, body: fs.createReadStream(filePath) },
   });
-
   const bannerUrl = bannerRes.data.url;
-  const current   = await getChannel();
 
+  const current = await getChannel();
   await yt.channels.update({
     part: ['brandingSettings'],
     requestBody: {
@@ -318,14 +244,14 @@ async function uploadChannelBanner(filePath) {
       },
     },
   });
-
-  logger.info(`[NatureYouTube] Channel banner updated → ${bannerUrl}`);
+  logger.info(`[FootballYouTube] Channel banner updated → ${bannerUrl}`);
   return { bannerUrl };
 }
 
 module.exports = {
   REFRESH_TOKEN_KEY,
   LIVE_SCOPES,
+  CALLBACK_PATH,
   getRedirectUri,
   createOAuth2Client,
   isConfigured,

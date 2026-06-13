@@ -2466,6 +2466,334 @@ const NatureLiveSection = () => {
   );
 };
 
+// ─── SECTION: Football Live ──────────────────────────────────────
+const FOOTBALL_STATUS_COLORS = {
+  idle: T.dim, starting: T.warn, preview: T.info, live: T.ok, error: T.err, stopped: T.muted,
+};
+
+const FootballYoutubeConnectionCard = () => {
+  const [status, setStatus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState('');
+
+  const loadStatus = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await AdminClient.getFootballLiveStatus();
+      setStatus(data.youtube);
+    } catch (e) { setStatus(null); }
+    setLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    loadStatus();
+    const handler = (e) => {
+      if (e.data === 'football-youtube-connected') { setMsg(''); loadStatus(); }
+      else if (typeof e.data === 'string' && e.data.startsWith('football-youtube-error:')) {
+        setMsg('✗ ' + e.data.slice('football-youtube-error:'.length));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const handleConnect = async () => {
+    setMsg('');
+    try {
+      const { authUrl } = await AdminClient.getFootballYoutubeAuthUrl();
+      window.open(authUrl, 'football-youtube-auth', 'width=560,height=680,resizable=yes');
+    } catch (e) { setMsg('✗ ' + e.message); }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Football YouTube channel?')) return;
+    try {
+      await AdminClient.disconnectFootballYoutube();
+      setMsg('Disconnected.');
+      loadStatus();
+    } catch (e) { setMsg('✗ ' + e.message); }
+  };
+
+  return (
+    <Card title="Football YouTube (separate channel)">
+      <div style={{ fontSize: 12, fontFamily: T.sans, color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>
+        Use a <strong style={{ color: T.text }}>different Google account</strong> than book-review Videos and Nature Live. Sign in with your football channel when connecting.
+      </div>
+      <div style={{ fontSize: 11, fontFamily: T.sans, color: T.warn, marginBottom: 12, lineHeight: 1.5, padding: 10, borderRadius: 6, background: `${T.warn}15` }}>
+        YouTube must <strong>approve live streaming</strong> on this channel first (Studio → Create → Go live once, verify phone, up to 24h).
+      </div>
+      {loading ? (
+        <div style={{ fontFamily: T.mono, fontSize: 12, color: T.muted }}>Checking…</div>
+      ) : !status?.clientConfigured ? (
+        <div style={{ fontSize: 13, color: T.warn }}>Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in environment.</div>
+      ) : status?.connected ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: T.mono, fontSize: 13, color: T.ok }}>✓ {status.channelName || 'Connected'}</span>
+          {status.channelId && (
+            <a href={`https://youtube.com/channel/${status.channelId}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: T.dim }}>channel ↗</a>
+          )}
+          <Btn small variant="danger" onClick={handleDisconnect}>Disconnect</Btn>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 8, fontFamily: T.mono }}>
+            Redirect: {status?.redirectUri || '…'}
+          </div>
+          <Btn variant="primary" onClick={handleConnect}>Connect Football Channel</Btn>
+        </div>
+      )}
+      {msg && <div style={{ marginTop: 8, fontSize: 12, fontFamily: T.mono, color: msg.startsWith('✗') ? T.err : T.ok }}>{msg}</div>}
+    </Card>
+  );
+};
+
+const FootballSection = () => {
+  const [busy, setBusy] = React.useState(false);
+  const [poll, setPoll] = React.useState(0);
+  const [localMsg, setLocalMsg] = React.useState('');
+  const [editing, setEditing] = React.useState(false);
+  const [editFields, setEditFields] = React.useState({ title: '', description: '', tags: '', categoryId: '17' });
+  const [uploadProgress, setUploadProgress] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const { data, loading, error, refresh } = useAdminApi(() => AdminClient.getFootballLiveStatus(), [poll]);
+
+  React.useEffect(() => {
+    const stream = data?.stream;
+    if (stream && !editing) {
+      setEditFields({
+        title:       stream.title || '',
+        description: stream.description || '',
+        tags:        Array.isArray(stream.tags) ? stream.tags.join(', ') : '',
+        categoryId:  stream.categoryId || '17',
+      });
+    }
+  }, [data]);
+
+  React.useEffect(() => {
+    const st = data?.stream?.status;
+    if (['starting', 'preview'].includes(st)) {
+      const t = setInterval(() => setPoll((p) => p + 1), 5000);
+      return () => clearInterval(t);
+    }
+  }, [data?.stream?.status]);
+
+  const act = async (fn, label) => {
+    setBusy(true);
+    setLocalMsg('');
+    try {
+      await fn();
+      setLocalMsg(`✓ ${label}`);
+      refresh();
+    } catch (e) {
+      setLocalMsg('✗ ' + e.message);
+    }
+    setBusy(false);
+  };
+
+  const handleSaveMeta = async () => {
+    await act(async () => {
+      await AdminClient.updateFootballStream({
+        title:       editFields.title.trim(),
+        description: editFields.description.trim(),
+        tags:        editFields.tags.split(',').map((t) => t.trim()).filter(Boolean),
+        categoryId:  editFields.categoryId,
+      });
+      setEditing(false);
+    }, 'Saved');
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.mp4')) {
+      setLocalMsg('✗ Only .mp4 files are supported');
+      return;
+    }
+    setLocalMsg('');
+    setUploadProgress(0);
+    try {
+      const result = await AdminClient.uploadFootballVideo(file, (pct) => setUploadProgress(pct));
+      setUploadProgress(null);
+      setLocalMsg(`✓ Uploaded ${(result.bytes / 1024 / 1024 / 1024).toFixed(2)} GB`);
+      refresh();
+    } catch (err) {
+      setUploadProgress(null);
+      setLocalMsg('✗ ' + err.message);
+    }
+    e.target.value = '';
+  };
+
+  const stream = data?.stream || {};
+  const st     = stream.status || 'idle';
+  const color  = FOOTBALL_STATUS_COLORS[st] || T.dim;
+  const studioUrl = stream.youtubeStudioUrl || (stream.youtubeBroadcastId ? `https://studio.youtube.com/video/${stream.youtubeBroadcastId}/livestreaming` : null);
+  const isActive = ['live', 'preview', 'starting'].includes(st);
+
+  const YOUTUBE_CATEGORIES = [
+    { id: '17', label: 'Sports' },
+    { id: '22', label: 'People & Blogs' },
+    { id: '10', label: 'Music' },
+    { id: '24', label: 'Entertainment' },
+    { id: '25', label: 'News & Politics' },
+    { id: '28', label: 'Science & Technology' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontFamily: T.serif, fontSize: 32, margin: 0 }}>Football Live</h1>
+          <p style={{ fontFamily: T.sans, fontSize: 13, color: T.muted, marginTop: 8, maxWidth: 640, lineHeight: 1.6 }}>
+            Workflow: <strong>Upload video</strong> → <strong>Set title & tags</strong> → <strong>Prepare</strong> (YouTube preview) → <strong>Go live</strong>.
+            Streams <code>mynewstream.mp4</code> on a loop 24/7.
+          </p>
+        </div>
+        <Btn variant="danger" disabled={busy || !isActive} onClick={() => act(() => AdminClient.stopFootballStream(), 'Stopped')}>
+          Stop stream
+        </Btn>
+      </div>
+
+      {/* Metrics */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <Metric label="Status" value={st.toUpperCase()} />
+        <Metric label="Encoder" value={data?.stream?.encoderRunning ? 'Running' : 'Stopped'} />
+        <Metric label="Video file" value={data?.videoExists ? `${(data.videoBytes / 1024 / 1024 / 1024).toFixed(2)} GB` : 'Not found'} />
+        <Metric label="YouTube" value={data?.youtube?.connected ? (data.youtube.channelName || 'Connected') : 'Not connected'} />
+      </div>
+
+      {error && (
+        <div style={{ padding: 12, borderRadius: 8, background: `${T.err}20`, color: T.err, fontFamily: T.mono, fontSize: 12 }}>
+          {error.message}
+        </div>
+      )}
+
+      {/* Stream card */}
+      <Card title="Stream">
+        {/* Status row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: T.mono, fontSize: 11, color, textTransform: 'uppercase', letterSpacing: '.1em', background: `${color}18`, padding: '3px 8px', borderRadius: 4 }}>{st}</span>
+          {stream.youtubeLifeCycle && (
+            <span style={{ fontFamily: T.mono, fontSize: 10, color: T.dim }}>YouTube: {stream.youtubeLifeCycle}</span>
+          )}
+          {stream.lastError && (
+            <span style={{ fontFamily: T.mono, fontSize: 11, color: T.err, wordBreak: 'break-word' }}>{stream.lastError}</span>
+          )}
+        </div>
+
+        {/* Metadata editor */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontFamily: T.sans, fontSize: 13, fontWeight: 600 }}>Stream settings</span>
+            {!editing
+              ? <Btn small variant="ghost" onClick={() => setEditing(true)}>Edit</Btn>
+              : <div style={{ display: 'flex', gap: 8 }}>
+                  <Btn small variant="primary" disabled={busy} onClick={handleSaveMeta}>Save</Btn>
+                  <Btn small variant="ghost" onClick={() => { setEditing(false); }}>Cancel</Btn>
+                </div>
+            }
+          </div>
+          {editing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ fontFamily: T.sans, fontSize: 11, color: T.muted, display: 'block', marginBottom: 4 }}>Title</label>
+                <input value={editFields.title} onChange={(e) => setEditFields((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="Football Live 24/7" maxLength={100}
+                  style={{ width: '100%', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: '8px 10px', color: T.text, fontFamily: T.sans, fontSize: 13, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontFamily: T.sans, fontSize: 11, color: T.muted, display: 'block', marginBottom: 4 }}>Description</label>
+                <textarea value={editFields.description} onChange={(e) => setEditFields((f) => ({ ...f, description: e.target.value }))}
+                  rows={4} maxLength={5000} placeholder="Live football stream 24/7…"
+                  style={{ width: '100%', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: '8px 10px', color: T.text, fontFamily: T.sans, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontFamily: T.sans, fontSize: 11, color: T.muted, display: 'block', marginBottom: 4 }}>Tags (comma-separated)</label>
+                <input value={editFields.tags} onChange={(e) => setEditFields((f) => ({ ...f, tags: e.target.value }))}
+                  placeholder="football, live stream, sports"
+                  style={{ width: '100%', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: '8px 10px', color: T.text, fontFamily: T.sans, fontSize: 13, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontFamily: T.sans, fontSize: 11, color: T.muted, display: 'block', marginBottom: 4 }}>Category</label>
+                <select value={editFields.categoryId} onChange={(e) => setEditFields((f) => ({ ...f, categoryId: e.target.value }))}
+                  style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: '8px 10px', color: T.text, fontFamily: T.sans, fontSize: 13 }}>
+                  {YOUTUBE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, fontFamily: T.mono, color: T.muted, lineHeight: 1.6 }}>
+              <div><strong style={{ color: T.text }}>Title:</strong> {stream.title || <em>not set</em>}</div>
+              <div style={{ marginTop: 4 }}><strong style={{ color: T.text }}>Description:</strong> {stream.description ? stream.description.slice(0, 120) + (stream.description.length > 120 ? '…' : '') : <em>not set</em>}</div>
+              <div style={{ marginTop: 4 }}><strong style={{ color: T.text }}>Tags:</strong> {Array.isArray(stream.tags) && stream.tags.length ? stream.tags.join(', ') : <em>none</em>}</div>
+              <div style={{ marginTop: 4 }}><strong style={{ color: T.text }}>Category:</strong> {YOUTUBE_CATEGORIES.find((c) => c.id === stream.categoryId)?.label || 'Sports'}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Video file */}
+        <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: `${T.bg}`, border: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <div style={{ fontFamily: T.sans, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Video file</div>
+              <div style={{ fontFamily: T.mono, fontSize: 11, color: T.muted }}>{data?.videoPath || '…'}</div>
+              {data?.videoExists
+                ? <div style={{ fontFamily: T.mono, fontSize: 11, color: T.ok, marginTop: 2 }}>✓ {(data.videoBytes / 1024 / 1024 / 1024).toFixed(2)} GB on server</div>
+                : <div style={{ fontFamily: T.mono, fontSize: 11, color: T.err, marginTop: 2 }}>✗ File not found — upload below</div>
+              }
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <input ref={fileInputRef} type="file" accept=".mp4,video/mp4" style={{ display: 'none' }} onChange={handleUpload} />
+              <Btn small variant="primary" disabled={uploadProgress !== null} onClick={() => fileInputRef.current?.click()}>
+                {uploadProgress !== null ? `Uploading ${uploadProgress}%…` : 'Upload video ↑'}
+              </Btn>
+              {uploadProgress !== null && (
+                <div style={{ width: 160, height: 4, background: T.border, borderRadius: 2 }}>
+                  <div style={{ width: `${uploadProgress}%`, height: '100%', background: T.accent, borderRadius: 2, transition: 'width .3s' }} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stream controls */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <Btn small variant="primary"
+            disabled={busy || !data?.videoExists || isActive}
+            onClick={() => act(() => AdminClient.prepareFootballStream(), 'Preparing YouTube preview…')}
+            title={!data?.videoExists ? 'Upload video first' : isActive ? 'Already running' : ''}>
+            1. Prepare (YT preview)
+          </Btn>
+          <Btn small variant="primary"
+            disabled={busy || (st !== 'preview' && st !== 'starting')}
+            onClick={() => act(() => AdminClient.goLiveFootballStream(), 'Now live')}>
+            2. Go live
+          </Btn>
+          <Btn small variant="danger"
+            disabled={busy || !isActive}
+            onClick={() => act(() => AdminClient.stopFootballStream(), 'Stopped')}>
+            Stop
+          </Btn>
+          {studioUrl && isActive && (
+            <Btn small variant="ghost" onClick={() => window.open(studioUrl, '_blank')}>Studio ↗</Btn>
+          )}
+          {stream.youtubeWatchUrl && ['preview', 'live'].includes(st) && (
+            <Btn small variant="ghost" onClick={() => window.open(stream.youtubeWatchUrl, '_blank')}>Watch ↗</Btn>
+          )}
+          {loading && <span style={{ fontFamily: T.mono, fontSize: 11, color: T.muted, alignSelf: 'center' }}>Refreshing…</span>}
+        </div>
+
+        {localMsg && (
+          <div style={{ marginTop: 10, fontSize: 11, fontFamily: T.mono, color: localMsg.startsWith('✗') ? T.err : T.ok }}>{localMsg}</div>
+        )}
+      </Card>
+
+      <FootballYoutubeConnectionCard />
+    </div>
+  );
+};
+
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: '◐' },
   { id: 'runs', label: 'Agent Runs', icon: '▶' },
@@ -2473,6 +2801,7 @@ const SECTIONS = [
   { id: 'authors', label: 'Authors', icon: '✍' },
   { id: 'videos', label: 'Videos', icon: '▷' },
   { id: 'nature-live', label: 'Nature Live', icon: '◎' },
+  { id: 'football', label: 'Football', icon: '⬡' },
   { id: 'scraper', label: 'Scraper', icon: '⇣' },
   { id: 'duplicates', label: 'Duplicates', icon: '⊘' },
   { id: 'competitors', label: 'Competitors', icon: '◈' },
@@ -2500,6 +2829,7 @@ const Admin = ({ setRoute }) => {
     authors: AuthorsSection,
     videos: VideosSection,
     'nature-live': NatureLiveSection,
+    football: FootballSection,
     scraper: ScraperSection,
     duplicates: DuplicatesSection,
     competitors: CompetitorSection,

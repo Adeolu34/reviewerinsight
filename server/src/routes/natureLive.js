@@ -223,6 +223,76 @@ router.delete('/youtube/disconnect', async (req, res, next) => {
   }
 });
 
+// GET /api/admin/nature-live/youtube/channel — fetch channel branding & stats
+router.get('/youtube/channel', async (req, res, next) => {
+  try {
+    const channel = await natureYoutube.getChannel();
+    res.json({
+      id:          channel.id,
+      title:       channel.snippet?.title,
+      description: channel.snippet?.description,
+      country:     channel.snippet?.country,
+      language:    channel.snippet?.defaultLanguage,
+      keywords:    channel.brandingSettings?.channel?.keywords?.split(' ').filter(Boolean) || [],
+      unsubscribedTrailer:   channel.brandingSettings?.channel?.unsubscribedTrailer || null,
+      featuredChannelsTitle: channel.brandingSettings?.channel?.featuredChannelsTitle || null,
+      featuredChannelsUrls:  channel.brandingSettings?.channel?.featuredChannelsUrls || [],
+      bannerUrl:             channel.brandingSettings?.image?.bannerExternalUrl || null,
+      statistics: {
+        subscribers: channel.statistics?.subscriberCount,
+        views:       channel.statistics?.viewCount,
+        videos:      channel.statistics?.videoCount,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/admin/nature-live/youtube/channel — update channel branding settings
+// Body: { title, description, keywords, country, defaultLanguage,
+//         unsubscribedTrailer, featuredChannelsUrls, featuredChannelsTitle }
+router.patch('/youtube/channel', async (req, res, next) => {
+  try {
+    const allowed = [
+      'title', 'description', 'keywords', 'country', 'defaultLanguage',
+      'unsubscribedTrailer', 'featuredChannelsUrls', 'featuredChannelsTitle',
+    ];
+    const opts = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) opts[key] = req.body[key];
+    }
+    if (!Object.keys(opts).length) {
+      return res.status(400).json({ error: 'No valid fields provided' });
+    }
+    const result = await natureYoutube.updateChannel(opts);
+    res.json({ ok: true, channelId: result.id });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/nature-live/youtube/channel/banner — upload channel banner image
+// Send raw JPEG or PNG bytes; set Content-Type accordingly. Min 2048x1152, max 10 MB.
+router.post('/youtube/channel/banner',
+  express.raw({ type: ['image/jpeg', 'image/png'], limit: '10mb' }),
+  async (req, res, next) => {
+    try {
+      if (!req.body || !req.body.length) {
+        return res.status(400).json({ error: 'No image body. Send raw JPEG or PNG bytes with matching Content-Type.' });
+      }
+      const os  = require('os');
+      const ext = req.headers['content-type'] === 'image/png' ? 'png' : 'jpg';
+      const tmp = path.join(os.tmpdir(), `nature-banner-${Date.now()}.${ext}`);
+      await fs.promises.writeFile(tmp, req.body);
+      try {
+        const result = await natureYoutube.uploadChannelBanner(tmp);
+        fs.promises.unlink(tmp).catch(() => {});
+        res.json({ ok: true, bannerUrl: result.bannerUrl });
+      } catch (uploadErr) {
+        fs.promises.unlink(tmp).catch(() => {});
+        next(uploadErr);
+      }
+    } catch (err) { next(err); }
+  }
+);
+
 router.post('/stop-all', async (req, res, next) => {
   try {
     await supervisor.stopAll();
@@ -230,6 +300,45 @@ router.post('/stop-all', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// PATCH /api/admin/nature-live/:themeId — edit stream metadata
+// Body: { title, description, tags, categoryId }
+// If the stream is currently live/preview, also updates the YouTube broadcast in real-time.
+router.patch('/:themeId', async (req, res, next) => {
+  try {
+    const { themeId } = req.params;
+    if (!NATURE_THEMES.find((t) => t.id === themeId)) {
+      return res.status(404).json({ error: 'Unknown theme' });
+    }
+
+    const allowed = ['title', 'description', 'tags', 'categoryId'];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: 'No valid fields provided (title, description, tags, categoryId)' });
+    }
+
+    const { categoryId, ...dbUpdates } = updates;
+    const doc = await NatureStream.findOneAndUpdate(
+      { themeId },
+      { $set: dbUpdates },
+      { new: true },
+    );
+
+    // If there's an active broadcast, push the changes to YouTube live
+    if (doc?.youtubeBroadcastId && ['live', 'preview', 'starting'].includes(doc.status)) {
+      try {
+        await natureYoutube.updateBroadcastMetadata(doc.youtubeBroadcastId, updates);
+      } catch (ytErr) {
+        logger.warn(`[NatureLive] Could not update live broadcast metadata: ${ytErr.message}`);
+      }
+    }
+
+    res.json({ ok: true, stream: doc });
+  } catch (err) { next(err); }
 });
 
 router.post('/:themeId/generate-assets', async (req, res, next) => {

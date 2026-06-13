@@ -23,7 +23,8 @@ const sitemapRouter = require('./routes/sitemap');
 const feedRouter = require('./routes/feed');
 const bookCanonicalRouter = require('./routes/bookCanonical');
 const authorsRouter = require('./routes/authors');
-const natureLiveRouter = require('./routes/natureLive');
+const natureLiveRouter   = require('./routes/natureLive');
+const footballLiveRouter = require('./routes/footballLive');
 const seoMiddleware = require('./middleware/seoMiddleware');
 
 async function startServer() {
@@ -115,8 +116,9 @@ async function startServer() {
   app.use('/api/editors', editorsRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/stats', statsRouter);
-  // Nature Live before /api/admin — admin router's requireAdmin blocks unmatched /api/admin/* paths
+  // Nature Live and Football Live before /api/admin — admin router's requireAdmin blocks unmatched /api/admin/* paths
   app.use('/api/admin/nature-live', natureLiveRouter);
+  app.use('/api/admin/football-live', footballLiveRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
@@ -256,12 +258,29 @@ async function startServer() {
   cron.schedule('0 21 * * *', runScheduledVideo, { timezone: 'UTC' });
   logger.info('VideoAgent schedule: daily at 3:00 AM, 9:00 AM, 3:00 PM and 9:00 PM UTC');
 
-  const natureSupervisor = require('./services/natureStreamSupervisor');
+  const natureSupervisor   = require('./services/natureStreamSupervisor');
+  const footballSupervisor = require('./services/footballStreamSupervisor');
   const storageCleanup = require('./services/storageCleanup');
+
+  // Reset football stream if it was stuck mid-start on restart
+  const FootballStream = require('./models/FootballStream');
+  const stuckFootball = await FootballStream.updateMany(
+    { status: 'starting' },
+    { $set: { status: 'error', lastError: 'Server restarted mid-start', ffmpegPid: null } },
+  );
+  if (stuckFootball.modifiedCount > 0) {
+    logger.warn(`[startup] Reset ${stuckFootball.modifiedCount} stuck football stream(s)`);
+  }
+
   natureSupervisor.startWatchdogCron();
+  footballSupervisor.startWatchdogCron();
   storageCleanup.startStorageCleanupCron();
+
   natureSupervisor.resumeLiveOnStartup().catch((err) => {
     logger.error(`[NatureStream] Startup resume failed: ${err.message}`);
+  });
+  footballSupervisor.resumeLiveOnStartup().catch((err) => {
+    logger.error(`[FootballStream] Startup resume failed: ${err.message}`);
   });
 
   app.listen(config.port, () => {
