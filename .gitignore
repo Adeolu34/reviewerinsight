@@ -8,3 +8,6 @@ nul
 server/server.log
 nature-live/
 server/nature-live/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
