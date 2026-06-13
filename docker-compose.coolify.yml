@@ -12,9 +12,6 @@ services:
       - "3000:3000"
     restart: unless-stopped
     volumes:
-      - video-data:/var/data/reviewinsight/videos
-      - nature-live-data:/var/data/reviewinsight/nature-live
-
-volumes:
-  video-data:
-  nature-live-data:
+      - /var/data/reviewinsight/videos:/var/data/reviewinsight/videos
+      - /var/data/reviewinsight/nature-live:/var/data/reviewinsight/nature-live
+      - /var/data/reviewinsight/football:/var/data/reviewinsight/football
