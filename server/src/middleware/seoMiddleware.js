@@ -42,8 +42,13 @@ function truncate(str, len = 160) {
   return clean.slice(0, len - 3) + '...';
 }
 
+// Characters that can terminate a <script> block or inject markup inside JSON-LD
+const JSONLD_UNSAFE = new RegExp('[<>&' + String.fromCharCode(0x2028, 0x2029) + ']', 'g');
+
 function buildJsonLd(obj) {
-  return `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', ...obj })}</script>`;
+  const json = JSON.stringify({ '@context': 'https://schema.org', ...obj })
+    .replace(JSONLD_UNSAFE, (c) => String.fromCharCode(92) + 'u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  return `<script type="application/ld+json">${json}</script>`;
 }
 
 // ─── Page-specific meta generators ──────────────────────────────
@@ -477,3 +482,5 @@ function seoMiddleware(req, res, next) {
 }
 
 module.exports = seoMiddleware;
+
+module.exports.buildJsonLd = buildJsonLd; // exported for tests

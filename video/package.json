@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Remotion video compositions for Reviewer Insight book summaries",
   "scripts": {
-    "start": "remotion studio",
-    "build": "remotion render BookSummary --props='{}'",
+    "start": "node init && remotion studio",
+    "build": "node init && remotion render BookSummary --props='{}'",
     "render": "node render.js"
   },
   "dependencies": {

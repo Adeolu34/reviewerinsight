@@ -4,18 +4,22 @@ const Home = ({ setRoute, accent, density }) => {
   const pad = density === 'compact' ? 20 : 32;
 
   // API data with static fallbacks
-  const { resolved: stats } = useApi(
-    () => ApiClient.getStats(),
-    { totalBooks: BOOKS.length, totalSummaries: BOOKS.length, totalIssues: 48, latestIssue: 'No. 048' }
+  // One combined request batch -> ONE state update (and one page re-render) instead of three.
+  // Each call falls back independently, so a single failing endpoint never blanks the page.
+  const fallbackStats = { totalBooks: BOOKS.length, totalSummaries: BOOKS.length, totalIssues: 48, latestIssue: 'No. 048' };
+  const fallbackFeatured = { featured: BOOKS.find(b => b.id === 1), also: BOOKS.filter(b => b.featured && b.id !== 1).slice(0, 3) };
+  const fallbackLatest = { books: BOOKS.slice(0, 12), total: BOOKS.length };
+  const { resolved: homeData } = useApi(
+    () => Promise.all([
+      ApiClient.getStats().catch(() => null),
+      ApiClient.getFeatured().catch(() => null),
+      ApiClient.getBooks({ limit: 12 }).catch(() => null),
+    ]).then(([s, f, l]) => ({ stats: s, featured: f, latest: l })),
+    {}
   );
-  const { resolved: featuredData } = useApi(
-    () => ApiClient.getFeatured(),
-    { featured: BOOKS.find(b => b.id === 1), also: BOOKS.filter(b => b.featured && b.id !== 1).slice(0, 3) }
-  );
-  const { resolved: latestData } = useApi(
-    () => ApiClient.getBooks({ limit: 12 }),
-    { books: BOOKS.slice(0, 12), total: BOOKS.length }
-  );
+  const stats = homeData.stats || fallbackStats;
+  const featuredData = homeData.featured || fallbackFeatured;
+  const latestData = homeData.latest || fallbackLatest;
   const { resolved: trendingData } = useApi(
     () => ApiClient.getTrending(),
     { trending: [] }
@@ -128,7 +132,7 @@ const Home = ({ setRoute, accent, density }) => {
                 transform: calloutVis ? 'scale(1) translateY(0)' : 'scale(0.6) translateY(20px)',
                 transition: `all .6s ${i * .15 + .1}s cubic-bezier(.2,.8,.2,1)`
               }}>{item.num}</div>
-              <h3 style={{ font:'700 26px "DM Serif Display", Georgia, serif', margin:'14px 0 8px' }}>{item.title}</h3>
+              <h2 style={{ font:'700 26px "DM Serif Display", Georgia, serif', margin:'14px 0 8px' }}>{item.title}</h2>
               <p style={{ font:'400 15px/1.55 "Space Grotesk", sans-serif', color:'#141210', opacity:.82, maxWidth: 340 }}>
                 {item.desc}
               </p>
@@ -409,7 +413,7 @@ const Home = ({ setRoute, accent, density }) => {
             <button onClick={() => setTrendingModal(null)} style={{
               position:'absolute', top:16, right:16, background:'transparent', border:0,
               cursor:'pointer', font:'600 11px "JetBrains Mono", monospace',
-              textTransform:'uppercase', letterSpacing:'.14em', opacity:.5,
+              textTransform:'uppercase', letterSpacing:'.14em', opacity: .68,
             }}>✕ Close</button>
 
             <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:28, alignItems:'start' }}>
@@ -494,7 +498,7 @@ const Footer = ({ accent, pad }) => {
         ))}
       </div>
       <div style={{ borderTop:'1px solid rgba(245,239,228,.15)', marginBottom: 20 }}/>
-      <div style={{ display:'flex', justifyContent:'space-between', font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', opacity:.5, position:'relative' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.14em', opacity: .68, position:'relative' }}>
         <span>© 2026 Reviewer Insight Editions Ltd.</span>
         <span>Issue No. 048 · Set in DM Serif Display, Space Grotesk, and JetBrains Mono.</span>
       </div>

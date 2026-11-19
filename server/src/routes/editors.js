@@ -1,4 +1,5 @@
 const express = require('express');
+const { clampInt } = require('../utils/pagination');
 const Editor = require('../models/Editor');
 const Book = require('../models/Book');
 const router = express.Router();
@@ -31,8 +32,8 @@ router.get('/', async (req, res, next) => {
 router.get('/:name/books', async (req, res, next) => {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const pageNum = clampInt(page, 1, 1, 100000);
+    const limitNum = clampInt(limit, 30, 1, 100);
 
     const filter = { editor: req.params.name, status: 'published' };
     const [books, total] = await Promise.all([

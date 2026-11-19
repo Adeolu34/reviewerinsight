@@ -11,19 +11,13 @@ const { generateAssetsForTheme, buildPreviewMux, themeDir } = require('../servic
 const natureExportManager = require('../services/natureExportManager');
 const supervisor = require('../services/natureStreamSupervisor');
 const requireAdmin = require('../middleware/requireAdmin');
+const { oauthPopupPage: sharedOauthPopupPage } = require('../utils/oauthPopup');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 function oauthPopupPage(ok, msg, eventName) {
-  return `<!DOCTYPE html><html>
-<head><title>Nature YouTube ${ok ? 'Connected' : 'Error'}</title></head>
-<body style="font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#eee">
-<script>
-if(window.opener){window.opener.postMessage(${JSON.stringify(ok ? eventName : `nature-youtube-error:${msg}`)},'*');window.close();}
-else{document.body.innerHTML='<h2 style="color:${ok ? '#10B981' : '#EF4444'}">${ok ? 'Connected! You can close this tab.' : 'Error: ' + msg}</h2>';}
-</script>
-</body></html>`;
+  return sharedOauthPopupPage({ label: 'Nature YouTube', ok, msg, successEvent: eventName, errorPrefix: 'nature-youtube-error' });
 }
 
 // ─── PUBLIC OAuth callback ───────────────────────────────────────
@@ -57,15 +51,15 @@ router.get('/youtube/callback', async (req, res) => {
   }
 });
 
-// Allow <video src="/api/.../preview?token=..."> (cannot send Authorization header on media elements)
-router.use((req, res, next) => {
-  if (req.method === 'GET' && /\/(preview|export-test)/.test(req.path) && req.query.token && !req.headers.authorization) {
-    req.headers.authorization = `Bearer ${req.query.token}`;
-  }
-  next();
-});
+// <video src> cannot send Authorization headers: accept a short-lived, scope-limited media token (GET preview/export-test only)
+router.use(requireAdmin.mediaTokenAuth);
 
 router.use(requireAdmin);
+
+// Issue a 30-minute media-only token for <video>/<audio>/download URLs (keeps the real admin JWT out of URLs)
+router.post('/media-token', (req, res) => {
+  res.json({ token: requireAdmin.signMediaToken(req.admin && req.admin._id), expiresInSeconds: 1800 });
+});
 
 function mediaFileStats(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return { exists: false, bytes: 0 };

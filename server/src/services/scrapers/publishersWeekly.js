@@ -31,7 +31,7 @@ class PublishersWeeklyScraper extends BaseScraper {
         const items = this.parseRssItems(xml);
 
         for (const item of items) {
-          const parsed = this.extractBookFromItem(item);
+          const parsed = this.extractBookFromItem(item, feedUrl);
           if (parsed) books.push(parsed);
         }
 
@@ -44,7 +44,7 @@ class PublishersWeeklyScraper extends BaseScraper {
     return books;
   }
 
-  extractBookFromItem(item) {
+  extractBookFromItem(item, feedUrl) {
     if (!item.title) return null;
 
     const t = item.title;

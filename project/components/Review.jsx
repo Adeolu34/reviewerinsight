@@ -122,7 +122,7 @@ const Review = ({ bookId, initialTab, setRoute, accent, density }) => {
                   transition: 'all .25s ease',
                   position: 'relative'
                 }}>
-                  {t.label} <span style={{ opacity:.5, marginLeft: 8 }}>· {t.note}</span>
+                  {t.label} <span style={{ opacity: .68, marginLeft: 8 }}>· {t.note}</span>
                   {tab===t.id && <div style={{ position:'absolute', bottom:-1.5, left:0, right:0, height:2, background:accent }}/>}
                 </button>
               ))}
@@ -434,7 +434,7 @@ const ChaptersBody = ({ book, accent, pad }) => {
       <h2 style={{ font:'900 56px "DM Serif Display", Georgia, serif', margin:'10px 0 12px', letterSpacing:'-.02em', lineHeight:.95, textWrap:'balance' }}>
         The architecture of the book.
       </h2>
-      <p style={{ font:'400 14px/1.5 "Space Grotesk", sans-serif', opacity:.5, margin:'0 0 32px', maxWidth: 600 }}>
+      <p style={{ font:'400 14px/1.5 "Space Grotesk", sans-serif', opacity: .68, margin:'0 0 32px', maxWidth: 600 }}>
         AI-generated overview based on available book information. Not a verbatim reproduction of the text.
       </p>
 

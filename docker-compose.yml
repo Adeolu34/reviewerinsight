@@ -22,8 +22,9 @@ services:
   mongo:
     image: mongo:7
     pull_policy: if_not_present
+    # Bound to localhost only; MongoDB has no auth in local dev, never expose it publicly
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped

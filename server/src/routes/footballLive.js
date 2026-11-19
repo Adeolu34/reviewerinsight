@@ -6,19 +6,13 @@ const FootballStream  = require('../models/FootballStream');
 const footballYoutube = require('../services/footballYoutube');
 const supervisor      = require('../services/footballStreamSupervisor');
 const requireAdmin    = require('../middleware/requireAdmin');
+const { oauthPopupPage: sharedOauthPopupPage } = require('../utils/oauthPopup');
 const logger          = require('../utils/logger');
 
 const router = express.Router();
 
 function oauthPopupPage(ok, msg) {
-  return `<!DOCTYPE html><html>
-<head><title>Football YouTube ${ok ? 'Connected' : 'Error'}</title></head>
-<body style="font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#eee">
-<script>
-if(window.opener){window.opener.postMessage(${JSON.stringify(ok ? 'football-youtube-connected' : `football-youtube-error:${msg}`)},'*');window.close();}
-else{document.body.innerHTML='<h2 style="color:${ok ? '#10B981' : '#EF4444'}">${ok ? 'Connected! You can close this tab.' : 'Error: ' + msg}</h2>';}
-</script>
-</body></html>`;
+  return sharedOauthPopupPage({ label: 'Football YouTube', ok, msg, successEvent: 'football-youtube-connected', errorPrefix: 'football-youtube-error' });
 }
 
 // ─── PUBLIC OAuth callback ───────────────────────────────────────

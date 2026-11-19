@@ -223,7 +223,7 @@ const FreeTextStep = ({ value, onChange, onSubmit, onSkip, accent }) => (
       onFocus={e => { e.target.style.borderColor = accent; e.target.style.boxShadow = `0 0 0 3px ${accent}22`; }}
       onBlur={e => { e.target.style.borderColor = '#141210'; e.target.style.boxShadow = 'none'; }}
     />
-    <div style={{ font: '400 11px "JetBrains Mono", monospace', opacity: .5, marginTop: 6, textAlign: 'right' }}>{value.length}/500</div>
+    <div style={{ font: '400 11px "JetBrains Mono", monospace', opacity: .68, marginTop: 6, textAlign: 'right' }}>{value.length}/500</div>
     <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
       <button onClick={onSubmit} className="ri-btn-primary" style={{
         font: '700 14px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em',
@@ -305,7 +305,7 @@ const ExternalBookCard = ({ book, index, accent }) => (
     padding: 20, border: '1.5px solid #14121020', borderRadius: 4, position: 'relative',
     animation: `ri-fadeUp .5s ${index * 0.1}s cubic-bezier(.2,.8,.2,1) both`,
   }} className="ri-card">
-    <div style={{ position: 'absolute', top: 10, right: 10, font: '600 8px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', padding: '3px 8px', background: '#14121010', borderRadius: 999, color: '#141210', opacity: .5 }}>External</div>
+    <div style={{ position: 'absolute', top: 10, right: 10, font: '600 8px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.12em', padding: '3px 8px', background: '#14121010', borderRadius: 999, color: '#141210', opacity: .68 }}>External</div>
     {book.coverImageUrl ? (
       <img src={book.coverImageUrl} alt={book.title} loading="lazy" decoding="async" style={{ width: '100%', height: 200, objectFit: 'contain', borderRadius: 2, marginBottom: 14, background: '#14121008' }} />
     ) : (

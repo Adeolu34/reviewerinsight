@@ -5,7 +5,7 @@ const AuthorAvatar = ({
   name,
   photoUrl,
   size = 80,
-  accent = '#E8432C'
+  accent = '#C8341F'
 }) => {
   const [imgError, setImgError] = React.useState(false);
   const initials = (name || '').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -620,7 +620,7 @@ const AuthorDetail = ({
       font: '600 10px "JetBrains Mono", monospace',
       textTransform: 'uppercase',
       letterSpacing: '.14em',
-      opacity: .5,
+      opacity: .68,
       marginTop: 4
     }
   }, s.label))))))), author.bio && /*#__PURE__*/React.createElement("section", {

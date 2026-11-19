@@ -3,6 +3,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const logger = require('../utils/logger');
+const { guarded } = require('../utils/jobGuard');
 const { getNatureLiveDir } = require('./natureAssets');
 
 const execFileAsync = promisify(execFile);
@@ -272,9 +273,8 @@ function startStorageCleanupCron() {
     runStorageCleanup({ reason: 'startup' }).catch(() => {});
   }, 60 * 1000);
 
-  setInterval(() => {
-    runStorageCleanup({ reason: 'scheduled' }).catch(() => {});
-  }, intervalMs);
+  const scheduledRun = guarded('storage-cleanup', () => runStorageCleanup({ reason: 'scheduled' }));
+  setInterval(scheduledRun, intervalMs);
 
   logger.info(`[StorageCleanup] Scheduled every ${Math.round(intervalMs / 3600000)}h (startup run after 60s)`);
 }

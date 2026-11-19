@@ -6,6 +6,7 @@ const { MAX_CONCURRENT_LIVE } = require('../config/natureThemes');
 const natureYoutube = require('./natureYoutube');
 const { getNatureAudioBitrate } = require('./natureAudio');
 const logger = require('../utils/logger');
+const { guarded } = require('../utils/jobGuard');
 
 /** themeId -> ChildProcess */
 const processes = new Map();
@@ -348,9 +349,8 @@ async function resumeLiveOnStartup() {
 
 function startWatchdogCron() {
   const intervalMs = parseInt(process.env.NATURE_WATCHDOG_INTERVAL_MS, 10) || 15000;
-  setInterval(() => {
-    watchdogTick().catch((err) => logger.error(`[NatureStream] Watchdog: ${err.message}`));
-  }, intervalMs);
+  const tick = guarded('nature-watchdog', watchdogTick);
+  setInterval(tick, intervalMs);
   logger.info(`[NatureStream] Watchdog every ${intervalMs}ms`);
 }
 

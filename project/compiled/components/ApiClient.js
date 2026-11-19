@@ -131,11 +131,12 @@ function useApi(fetchFn, fallback, deps = []) {
   });
   React.useEffect(() => {
     let cancelled = false;
-    setState(prev => ({
+    // Return the same object when already loading so React skips a pointless re-render on mount
+    setState(prev => prev.loading && !prev.error ? prev : {
       ...prev,
       loading: true,
       error: null
-    }));
+    });
     fetchFn().then(data => {
       if (!cancelled) setState({
         data,
@@ -183,6 +184,8 @@ async function checkApiAvailable() {
 // ─── Admin API Client ───────────────────────────────────────────
 const AdminClient = {
   _token: null,
+  _mediaToken: null,
+  _mediaTimer: null,
   getToken() {
     if (this._token) return this._token;
     this._token = sessionStorage.getItem('ri-admin-token');
@@ -191,10 +194,38 @@ const AdminClient = {
   setToken(token) {
     this._token = token;
     sessionStorage.setItem('ri-admin-token', token);
+    this.startMediaTokenRefresh();
   },
   clearToken() {
     this._token = null;
+    this._mediaToken = null;
+    if (this._mediaTimer) {
+      clearInterval(this._mediaTimer);
+      this._mediaTimer = null;
+    }
     sessionStorage.removeItem('ri-admin-token');
+  },
+  // Short-lived, media-only token for <video src>/<a href> URLs (keeps the real admin JWT out of URLs)
+  async refreshMediaToken() {
+    const token = this.getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/nature-live/media-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) this._mediaToken = (await res.json()).token;
+    } catch (e) {/* retried on next interval */}
+  },
+  startMediaTokenRefresh() {
+    this.refreshMediaToken();
+    if (this._mediaTimer) clearInterval(this._mediaTimer);
+    this._mediaTimer = setInterval(() => this.refreshMediaToken(), 10 * 60 * 1000); // token TTL is 30 min
+  },
+  getMediaToken() {
+    return this._mediaToken;
   },
   async login(email, password) {
     const res = await fetch(`${API_BASE}/admin/login`, {
@@ -436,12 +467,12 @@ const AdminClient = {
     });
   },
   natureExportTestDownloadUrl(themeId) {
-    const token = this.getToken();
+    const token = this.getMediaToken();
     const base = `${API_BASE}/admin/nature-live/${themeId}/export-test/download`;
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
   },
   natureExportTestStreamUrl(themeId) {
-    const token = this.getToken();
+    const token = this.getMediaToken();
     const base = `${API_BASE}/admin/nature-live/${themeId}/export-test/stream`;
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
   },
@@ -627,6 +658,11 @@ function riReviewRouteFromBook(book, extra = {}) {
     ...extra
   };
 }
+
+// Resume media-token refresh when an admin session already exists (page reload)
+try {
+  if (AdminClient.getToken()) AdminClient.startMediaTokenRefresh();
+} catch (e) {/* storage unavailable */}
 Object.assign(window, {
   ApiClient,
   AdminClient,

@@ -4,11 +4,12 @@
   "version": "1.0.0",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('compiled',{recursive:true,force:true})\"",
-    "build:web": "npm run clean && babel components --extensions .jsx --out-dir compiled/components && babel app.jsx --out-file compiled/app.js"
+    "build:web": "node init && npm run clean && babel components --extensions .jsx --out-dir compiled/components && babel app.jsx --out-file compiled/app.js && node build-bundle.js"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.3",
     "@babel/core": "^7.28.4",
-    "@babel/preset-react": "^7.27.1"
+    "@babel/preset-react": "^7.27.1",
+    "esbuild": "^0.28.2"
   }
 }

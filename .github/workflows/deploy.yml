@@ -18,6 +18,18 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Security audit (fail on high/critical)
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Lint (errors only)
+        working-directory: server
+        run: npm run lint
+
+      - name: Tests (unit + integration against in-memory MongoDB)
+        working-directory: server
+        run: npm test
+
       - name: Trigger Coolify Deploy
         run: |
           curl -s -X GET "${{ secrets.COOLIFY_WEBHOOK_URL }}"

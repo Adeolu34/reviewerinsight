@@ -21,4 +21,28 @@ const logger = winston.createLogger({
   ],
 });
 
+// Optional rotated file logs (set LOG_DIR). Bounded: 5 files x 5 MB each, oldest dropped automatically.
+if (process.env.LOG_DIR) {
+  const path = require('path');
+  const fs = require('fs');
+  try {
+    fs.mkdirSync(process.env.LOG_DIR, { recursive: true });
+    logger.add(new winston.transports.File({
+      filename: path.join(process.env.LOG_DIR, 'app.log'),
+      maxsize: 5 * 1024 * 1024,
+      maxFiles: 5,
+      tailable: true,
+    }));
+    logger.add(new winston.transports.File({
+      filename: path.join(process.env.LOG_DIR, 'error.log'),
+      level: 'error',
+      maxsize: 5 * 1024 * 1024,
+      maxFiles: 3,
+      tailable: true,
+    }));
+  } catch (err) {
+    console.error('[logger] could not enable file logging:', err.message);
+  }
+}
+
 module.exports = logger;

@@ -1,20 +1,34 @@
-// Security headers middleware — allows blob: scripts for Babel standalone JSX transpilation
-module.exports = function securityHeaders(req, res, next) {
-  // CSP: allow inline scripts (React CDN pattern), blob: (Babel standalone), and CDN sources
-  res.setHeader(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "img-src 'self' data: https: http:",
-      "media-src 'self' blob:",
-      "connect-src 'self' https://unpkg.com https://openlibrary.org https://www.googleapis.com https://books.google.com",
-    ].join('; ')
-  );
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  next();
+const helmet = require('helmet');
+
+const isProd = process.env.NODE_ENV === 'production';
+
+// Strict CSP: no inline/eval scripts. Frontend is precompiled JSX (no in-browser Babel);
+// React is loaded from unpkg with SRI hashes. Inline *styles* remain (React style props).
+const csp = {
+  useDefaults: false,
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", 'https://unpkg.com'],
+    scriptSrcAttr: ["'none'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    fontSrc: ["'self'", 'data:'],
+    imgSrc: ["'self'", 'data:', 'https:'],
+    mediaSrc: ["'self'", 'blob:'],
+    connectSrc: ["'self'", 'https://openlibrary.org', 'https://www.googleapis.com', 'https://books.google.com'],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+    frameAncestors: ["'none'"],
+    ...(isProd ? { upgradeInsecureRequests: [] } : {}),
+  },
 };
+
+module.exports = helmet({
+  contentSecurityPolicy: csp,
+  // Cover images/videos are loaded cross-origin by design
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'same-site' },
+  hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  frameguard: { action: 'deny' },
+});

@@ -314,7 +314,7 @@ const Browse = ({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       font: '600 11px "JetBrains Mono", monospace',
-      opacity: .5
+      opacity: .68
     }
   }, "No. ", String(i + 1).padStart(3, '0')), /*#__PURE__*/React.createElement(Cover, {
     book: b,

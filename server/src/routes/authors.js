@@ -1,4 +1,5 @@
 const express = require('express');
+const { clampInt } = require('../utils/pagination');
 const router = express.Router();
 const Author = require('../models/Author');
 const Book = require('../models/Book');
@@ -7,11 +8,14 @@ const Book = require('../models/Book');
 router.get('/', async (req, res) => {
   try {
     const { page = 1, limit = 30, genre, letter, sort = 'books', q } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = clampInt(page, 1, 1, 100000);
+    const limitNum = clampInt(limit, 30, 1, 100);
+    const skip = (pageNum - 1) * limitNum;
 
     const filter = {};
     if (genre) filter.genres = genre;
-    if (letter) filter.name = { $regex: new RegExp(`^${letter}`, 'i') };
+    // Single A-Z letter only (never build a RegExp from raw user input)
+    if (typeof letter === 'string' && /^[A-Za-z]$/.test(letter)) filter.name = { $regex: `^${letter}`, $options: 'i' };
     if (q) filter.$text = { $search: q };
 
     const sortMap = {
@@ -24,14 +28,14 @@ router.get('/', async (req, res) => {
       Author.find(filter)
         .sort(sortMap[sort] || sortMap.books)
         .skip(skip)
-        .limit(parseInt(limit))
+        .limit(limitNum)
         .lean(),
       Author.countDocuments(filter),
     ]);
 
-    res.json({ authors, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    res.json({ authors, total, page: pageNum, pages: Math.ceil(total / limitNum) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -42,7 +46,7 @@ router.get('/:slug', async (req, res) => {
     if (!author) return res.status(404).json({ error: 'Author not found' });
     res.json(author);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -59,7 +63,7 @@ router.get('/:slug/books', async (req, res) => {
 
     res.json({ books, total: books.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

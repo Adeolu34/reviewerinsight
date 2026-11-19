@@ -8,6 +8,21 @@ for (const key of required) {
   }
 }
 
+const crypto = require('crypto');
+
+/** JWT signing secret. Never fall back to a guessable value. */
+function resolveJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  const isProd = (process.env.NODE_ENV || 'development') === 'production';
+  if (secret && secret.length >= 32) return secret;
+  if (isProd) {
+    throw new Error('JWT_SECRET must be set to a random string of at least 32 characters in production');
+  }
+  // Development only: ephemeral random secret (tokens are invalidated on restart).
+  console.warn('[config] JWT_SECRET missing/short — using an ephemeral dev secret');
+  return crypto.randomBytes(48).toString('hex');
+}
+
 module.exports = {
   port: parseInt(process.env.PORT, 10) || 3001,
   mongoUri: process.env.MONGODB_URI,
@@ -30,7 +45,7 @@ module.exports = {
   googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY,
   nytApiKey: process.env.NYT_BOOKS_API_KEY,
   adminApiKey: process.env.ADMIN_API_KEY,
-  jwtSecret: process.env.JWT_SECRET || process.env.ADMIN_API_KEY || 'reviewer-insight-default-secret',
+  jwtSecret: resolveJwtSecret(),
   nodeEnv: process.env.NODE_ENV || 'development',
   elevenLabsKey: process.env.ELEVENLABS_API_KEY,
   elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID,

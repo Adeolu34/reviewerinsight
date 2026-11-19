@@ -1,4 +1,5 @@
 const express = require('express');
+const { clampInt } = require('../utils/pagination');
 const Book = require('../models/Book');
 const router = express.Router();
 
@@ -6,8 +7,8 @@ const router = express.Router();
 router.get('/', async (req, res, next) => {
   try {
     const { genre, editor, sort = 'newest', page = 1, limit = 30, featured } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const pageNum = clampInt(page, 1, 1, 100000);
+    const limitNum = clampInt(limit, 30, 1, 100);
 
     const filter = { status: 'published' };
     if (genre && genre !== 'All') filter.genre = genre;

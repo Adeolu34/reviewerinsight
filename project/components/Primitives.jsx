@@ -26,7 +26,7 @@ const Stars = ({ value = 0, size = 14, color = "#141210" }) => {
   );
 };
 
-const Eyebrow = ({ children, color = "#E8432C", style }) => (
+const Eyebrow = ({ children, color = "#C8341F", style }) => (
   <div style={{
     font: '600 11px "JetBrains Mono", monospace',
     textTransform:'uppercase', letterSpacing:'.14em', color, ...style
@@ -37,7 +37,7 @@ const Rule = ({ color = "#141210", weight = 1, style }) => (
   <div style={{ height: weight, background: color, ...style }}/>
 );
 
-const GenreTag = ({ children, onClick, active, accent = "#E8432C" }) => (
+const GenreTag = ({ children, onClick, active, accent = "#C8341F" }) => (
   <button onClick={onClick} className="ri-tag" style={{
     font:'600 11px "JetBrains Mono", monospace', textTransform:'uppercase', letterSpacing:'.12em',
     padding:'8px 14px', border:`1.5px solid ${active ? accent : '#141210'}`,
@@ -47,7 +47,7 @@ const GenreTag = ({ children, onClick, active, accent = "#E8432C" }) => (
   }}>{children}</button>
 );
 
-const Seal = ({ children, color = "#E8432C", rotate = -8, size = 96 }) => (
+const Seal = ({ children, color = "#C8341F", rotate = -8, size = 96 }) => (
   <div style={{
     width: size, height: size, borderRadius:'50%',
     border: `1.5px solid ${color}`, color, transform:`rotate(${rotate}deg)`,
@@ -156,7 +156,7 @@ const Header = ({ route, setRoute, accent, dark }) => {
               style={{ border:0, background:'transparent', outline:'none', font:'400 13px "Space Grotesk", sans-serif', color: ink, width:'100%' }}
             />
             {searchQuery && (
-              <span onClick={() => { setSearchQuery(''); searchRef.current?.focus(); }} style={{ cursor:'pointer', font:'600 14px "JetBrains Mono", monospace', color: ink, opacity:.5, lineHeight:1 }}>×</span>
+              <span onClick={() => { setSearchQuery(''); searchRef.current?.focus(); }} style={{ cursor:'pointer', font:'600 14px "JetBrains Mono", monospace', color: ink, opacity: .68, lineHeight:1 }}>×</span>
             )}
           </form>
           <button className="ri-btn-primary" style={{

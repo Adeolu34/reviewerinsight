@@ -10,6 +10,7 @@ const SITE_URL = config.siteUrl;
 /** Remove characters illegal in XML 1.0 text nodes (breaks Google’s parser if present in titles/URLs). */
 function stripIllegalXmlChars(str) {
   if (str == null) return '';
+  // eslint-disable-next-line no-control-regex -- intentionally strips illegal XML control characters
   return String(str).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '');
 }
 
