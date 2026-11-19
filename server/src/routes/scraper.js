@@ -1,4 +1,5 @@
 const express = require('express');
+const { clampInt } = require('../utils/pagination');
 const ScrapedBook = require('../models/ScrapedBook');
 const ScraperRun = require('../models/ScraperRun');
 const Book = require('../models/Book');
@@ -15,8 +16,8 @@ const VALID_GENRES = ['Fiction', 'Essays', 'Memoir', 'Sci-Fi', 'History', 'Busin
 router.get('/scraped-books', async (req, res, next) => {
   try {
     const { source, status, search, page = 1, limit = 50 } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const pageNum = clampInt(page, 1, 1, 100000);
+    const limitNum = clampInt(limit, 30, 1, 100);
 
     const filter = {};
     if (source) filter.source = source;
@@ -308,8 +309,8 @@ router.get('/competitor-insights', async (req, res, next) => {
 router.get('/scraper/runs', async (req, res, next) => {
   try {
     const { source, status, page = 1, limit = 20 } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const pageNum = clampInt(page, 1, 1, 100000);
+    const limitNum = clampInt(limit, 30, 1, 100);
 
     const filter = {};
     if (source) filter.source = source;

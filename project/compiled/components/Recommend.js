@@ -516,7 +516,7 @@ const FreeTextStep = ({
 }), /*#__PURE__*/React.createElement("div", {
   style: {
     font: '400 11px "JetBrains Mono", monospace',
-    opacity: .5,
+    opacity: .68,
     marginTop: 6,
     textAlign: 'right'
   }
@@ -759,7 +759,7 @@ const ExternalBookCard = ({
     background: '#14121010',
     borderRadius: 999,
     color: '#141210',
-    opacity: .5
+    opacity: .68
   }
 }, "External"), book.coverImageUrl ? /*#__PURE__*/React.createElement("img", {
   src: book.coverImageUrl,

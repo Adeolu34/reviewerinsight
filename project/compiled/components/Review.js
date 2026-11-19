@@ -255,7 +255,7 @@ const Review = ({
     }
   }, t.label, " ", /*#__PURE__*/React.createElement("span", {
     style: {
-      opacity: .5,
+      opacity: .68,
       marginLeft: 8
     }
   }, "\xB7 ", t.note), tab === t.id && /*#__PURE__*/React.createElement("div", {
@@ -1071,7 +1071,7 @@ const ChaptersBody = ({
   }, "The architecture of the book."), /*#__PURE__*/React.createElement("p", {
     style: {
       font: '400 14px/1.5 "Space Grotesk", sans-serif',
-      opacity: .5,
+      opacity: .68,
       margin: '0 0 32px',
       maxWidth: 600
     }

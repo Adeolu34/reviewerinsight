@@ -4,6 +4,7 @@ const path = require('path');
 const FootballStream = require('../models/FootballStream');
 const footballYoutube = require('./footballYoutube');
 const logger = require('../utils/logger');
+const { guarded } = require('../utils/jobGuard');
 
 const STREAM_ID = 'football';
 
@@ -282,9 +283,8 @@ function startWatchdogCron() {
   const intervalMs = parseInt(process.env.FOOTBALL_WATCHDOG_INTERVAL_MS, 10)
     || parseInt(process.env.NATURE_WATCHDOG_INTERVAL_MS, 10)
     || 60000;
-  setInterval(() => {
-    watchdogTick().catch((err) => logger.error(`[FootballStream] Watchdog: ${err.message}`));
-  }, intervalMs);
+  const tick = guarded('football-watchdog', watchdogTick);
+  setInterval(tick, intervalMs);
   logger.info(`[FootballStream] Watchdog every ${intervalMs}ms`);
 }
 

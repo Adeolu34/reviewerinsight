@@ -46,6 +46,24 @@ function pathToRoute(pathname) {
   return { name: 'home' };
 }
 
+/** Loads the (large) admin bundle only when the admin route is opened. */
+function AdminLazy(props) {
+  const [ready, setReady] = React.useState(!!window.Admin);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    if (window.Admin) { setReady(true); return undefined; }
+    const s = document.createElement('script');
+    s.src = window.__ADMIN_BUNDLE;
+    s.onload = () => setReady(true);
+    s.onerror = () => setFailed(true);
+    document.head.appendChild(s);
+    return () => { s.onload = null; s.onerror = null; };
+  }, []);
+  if (failed) return <div role="alert" style={{ padding: 40, fontFamily: 'sans-serif' }}>Could not load the admin panel. Please refresh.</div>;
+  if (!ready) return <div role="status" aria-live="polite" style={{ padding: 40, fontFamily: 'sans-serif' }}>Loading admin…</div>;
+  return <window.Admin {...props} />;
+}
+
 function App() {
   const [route, setRouteState] = React.useState(() => {
     try {
@@ -98,7 +116,7 @@ function App() {
   const ctx = { accent: tweaks.accent, density: tweaks.density, setRoute, route };
   const routeKey = route.name + (route.id || '');
   if (route.name === 'admin') {
-    return <window.Admin setRoute={setRoute} accent={tweaks.accent} />;
+    return <AdminLazy setRoute={setRoute} accent={tweaks.accent} />;
   }
 
   const Page = route.name === 'browse' ? window.Browse
@@ -111,13 +129,14 @@ function App() {
 
   return (
     <div data-screen-label={`Route: ${route.name}`} style={{ '--accent': tweaks.accent }}>
+      <a href="#main" className="skip-link">Skip to main content</a>
       <window.Header route={route} setRoute={setRoute} accent={tweaks.accent} />
-      <div key={routeKey}><Page {...ctx} /></div>
+      <main id="main" tabIndex={-1} key={routeKey} style={{ outline: 'none' }}><Page {...ctx} /></main>
       <div className={"tweaks-panel" + (tweaksOpen ? ' visible' : '')}>
         <h4>Tweaks</h4>
         <label>Accent color</label>
         <div className="swatches">
-          {['#E8432C', '#1E3A8A', '#E4A72B', '#0F5132', '#141210'].map(c => (
+          {['#C8341F', '#1E3A8A', '#E4A72B', '#0F5132', '#141210'].map(c => (
             <div key={c} className={"sw" + (tweaks.accent === c ? ' on' : '')} style={{ background: c }} onClick={() => updateTweak('accent', c)} />
           ))}
         </div>

@@ -1,15 +1,25 @@
 const cors = require('cors');
 
-module.exports = cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (file://, mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    // In development, allow all origins
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
-    // In production, restrict to your domain
-    const allowed = [process.env.FRONTEND_URL].filter(Boolean);
-    if (allowed.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
+function allowedOrigins() {
+  const list = [process.env.FRONTEND_URL, process.env.PUBLIC_SITE_URL, process.env.SITE_URL]
+    .filter(Boolean)
+    .map((u) => u.trim().replace(/\/+$/, ''));
+  return new Set(list);
+}
+
+module.exports = cors((req, callback) => {
+  const origin = req.headers.origin;
+  const base = { credentials: true, methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE'] };
+
+  // No Origin header: same-origin navigation, curl, server-to-server
+  if (!origin) return callback(null, { ...base, origin: true });
+  if (process.env.NODE_ENV !== 'production') return callback(null, { ...base, origin: true });
+
+  // Same-origin requests (browsers send Origin on POST) are always allowed
+  let sameHost = false;
+  try { sameHost = new URL(origin).host === req.headers.host; } catch (_) { /* invalid origin */ }
+  const ok = sameHost || allowedOrigins().has(origin.replace(/\/+$/, ''));
+
+  // Disallowed origins simply get no CORS headers (browser blocks) instead of a 500 error
+  return callback(null, { ...base, origin: ok });
 });

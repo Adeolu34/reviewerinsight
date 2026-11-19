@@ -1,13 +1,15 @@
 const express = require('express');
 const path = require('path');
+const compression = require('compression');
 const config = require('./config/env');
 const { connectDB } = require('./config/database');
 const corsMiddleware = require('./middleware/cors');
 const securityHeaders = require('./middleware/securityHeaders');
+const rateLimits = require('./middleware/rateLimits');
+const sanitizeQuery = require('./middleware/sanitizeQuery');
 const errorHandler = require('./middleware/errorHandler');
+const seoMiddleware = require('./middleware/seoMiddleware');
 const logger = require('./utils/logger');
-const AgentOrchestrator = require('./agents/AgentOrchestrator');
-const BackfillAgent = require('./agents/BackfillAgent');
 
 // Route imports
 const booksRouter = require('./routes/books');
@@ -23,90 +25,50 @@ const sitemapRouter = require('./routes/sitemap');
 const feedRouter = require('./routes/feed');
 const bookCanonicalRouter = require('./routes/bookCanonical');
 const authorsRouter = require('./routes/authors');
-const natureLiveRouter   = require('./routes/natureLive');
+const natureLiveRouter = require('./routes/natureLive');
 const footballLiveRouter = require('./routes/footballLive');
-const seoMiddleware = require('./middleware/seoMiddleware');
+const videosRouter = require('./routes/videos');
 
-async function startServer() {
-  // Connect to MongoDB
-  await connectDB(config.mongoUri);
+// Content-hashed bundles: compiled/site.<10 hex>.js and compiled/admin.<10 hex>.js (see project/build-bundle.js)
+const HASHED_BUNDLE = /[\\/](site|admin)\.[0-9a-f]{10}\.js$/;
 
-  if (typeof adminRouter.seedInitialAdmin === 'function') {
-    await adminRouter.seedInitialAdmin();
-  }
-
-  // Reset any video jobs that were left in-progress from a previous process
-  const VideoJob = require('./models/VideoJob');
-  const stuck = await VideoJob.updateMany(
-    { status: { $in: ['queued', 'scripting', 'tts', 'rendering'] } },
-    { $set: { status: 'failed', error: 'Server restarted mid-job', errorStep: 'startup' } },
-  );
-  if (stuck.modifiedCount > 0) {
-    logger.warn(`[startup] Reset ${stuck.modifiedCount} stuck video job(s) to failed`);
-  }
-
-  const NatureStream = require('./models/NatureStream');
-  const natureExportManager = require('./services/natureExportManager');
-  const fs = require('fs');
-
-  const stuckStarting = await NatureStream.updateMany(
-    { status: { $in: ['starting', 'generating'] } },
-    { $set: { status: 'error', lastError: 'Server restarted mid-operation', ffmpegPid: null } },
-  );
-  if (stuckStarting.modifiedCount > 0) {
-    logger.warn(`[startup] Reset ${stuckStarting.modifiedCount} stuck nature stream(s) (starting/generating)`);
-  }
-
-  const exporting = await NatureStream.find({ status: 'exporting' }).lean();
-  for (const doc of exporting) {
-    const minutes = doc.testExportMinutes || parseInt(process.env.NATURE_EXPORT_DEFAULT_MINUTES, 10) || 15;
-    const outPath = natureExportManager.expectedExportPath(doc.themeId, minutes);
-    const st = natureExportManager.fileStats(outPath);
-    if (st.exists && st.bytes > 2_000_000) {
-      await NatureStream.updateOne(
-        { _id: doc._id },
-        { $set: { status: 'ready', testExportPath: outPath, lastError: null, exportStartedAt: null } },
-      );
-      logger.info(`[startup] Recovered nature export file for ${doc.themeId}`);
-    } else {
-      await NatureStream.updateOne(
-        { _id: doc._id },
-        {
-          $set: {
-            status: 'ready',
-            lastError: 'Export interrupted on server restart — click Export again',
-            exportStartedAt: null,
-          },
-        },
-      );
-      if (st.exists && st.bytes < 2_000_000) {
-        try { fs.unlinkSync(outPath); } catch (_) {}
-      }
-    }
-  }
-  if (exporting.length > 0) {
-    logger.warn(`[startup] Cleared ${exporting.length} interrupted nature export(s)`);
-  }
-
+/** Build the Express app (no DB connection, no background jobs) — also used by tests. */
+function createApp() {
   const app = express();
 
-  // Behind Coolify/nginx — req.protocol and X-Forwarded-* for OAuth redirect URIs
+  // Behind Coolify/nginx — req.protocol and X-Forwarded-* for OAuth redirect URIs and rate limiting
   if (config.nodeEnv === 'production') {
     app.set('trust proxy', 1);
   }
 
-  // Middleware
+  app.disable('x-powered-by');
+  app.use(compression());
   app.use(corsMiddleware);
   app.use(securityHeaders);
-  app.use(express.json());
+  app.use(express.json({ limit: '100kb' }));
 
-  // Sitemap + RSS before static — ensures /sitemap.xml and /feed.xml are always dynamic XML, not a missing static file or HTML fallback.
+  // Rate limiting (per IP) and query hardening
+  app.use('/api', rateLimits.api);
+  app.use('/api', sanitizeQuery);
+  app.use('/api/admin/login', rateLimits.login);
+  app.use('/api/search', rateLimits.search);
+  app.use('/api/recommendations', rateLimits.recommendations);
+
+  // Sitemap + RSS before static — ensures /sitemap.xml and /feed.xml are always dynamic XML
   app.use(sitemapRouter);
   app.use(feedRouter);
   app.use(bookCanonicalRouter);
 
-  // Serve the frontend static files
-  app.use(express.static(path.join(__dirname, '../../project')));
+  // Frontend static files
+  app.use(express.static(path.join(__dirname, '../../project'), {
+    dotfiles: 'ignore',
+    maxAge: '1h',
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      // Content-hashed bundles never change at a given URL: cache for a year
+      if (filePath.endsWith('.woff2') || HASHED_BUNDLE.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    },
+  }));
 
   // API routes — trendingRouter must be before booksRouter so /api/books/trending
   // isn't swallowed by booksRouter's /:id wildcard route
@@ -123,58 +85,16 @@ async function startServer() {
   app.use('/api/admin', scraperRouter);
   app.use('/api/recommendations', recommendationsRouter);
   app.use('/api/authors', authorsRouter);
+  app.use('/videos', videosRouter);
 
-  // Video streaming — public, supports Range requests for seeking
-  app.get('/videos/:id/stream', async (req, res, next) => {
-    try {
-      const job = await VideoJob.findById(req.params.id).lean();
-      if (!job || !job.videoPath) return res.status(404).json({ error: 'Video not found' });
-      if (!fs.existsSync(job.videoPath)) return res.status(404).json({ error: 'File not on disk' });
-
-      const stat = fs.statSync(job.videoPath);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-
-      if (range) {
-        const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(startStr, 10);
-        const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
-        const chunkSize = end - start + 1;
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize,
-          'Content-Type': 'video/mp4',
-        });
-        fs.createReadStream(job.videoPath, { start, end }).pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-          'Content-Type': 'video/mp4',
-          'Accept-Ranges': 'bytes',
-        });
-        fs.createReadStream(job.videoPath).pipe(res);
-      }
-    } catch (err) { next(err); }
-  });
-
-  // Video file download (admin only)
-  const requireAdmin = require('./middleware/requireAdmin');
-  app.get('/videos/:id/download', requireAdmin, async (req, res, next) => {
-    try {
-      const job = await VideoJob.findById(req.params.id).lean();
-      if (!job || !job.videoPath) return res.status(404).json({ error: 'Video not found' });
-      if (!fs.existsSync(job.videoPath)) return res.status(404).json({ error: 'File not on disk' });
-      const filename = path.basename(job.videoPath);
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Type', 'video/mp4');
-      res.sendFile(job.videoPath);
-    } catch (err) { next(err); }
-  });
-
-  // Health check
+  // Health check (503 when the database is down so the orchestrator can restart us)
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const dbUp = require('mongoose').connection.readyState === 1;
+    res.status(dbUp ? 200 : 503).json({
+      status: dbUp ? 'ok' : 'degraded',
+      db: dbUp ? 'up' : 'down',
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // Fallback: serve the frontend with SEO meta injection for non-API routes
@@ -188,100 +108,20 @@ async function startServer() {
   // Error handler (must be last)
   app.use(errorHandler);
 
-  // Initialize agent orchestrator
-  const orchestrator = new AgentOrchestrator();
-  app.set('orchestrator', orchestrator);
+  return app;
+}
 
-  // Start scheduled agent runs (only if API keys are configured)
-  const openAiPlaceholder = !config.openaiKey || config.openaiKey === 'sk-your-openai-key-here';
-  const llmReady = !!config.openrouterKey || !openAiPlaceholder;
+async function startServer() {
+  await connectDB(config.mongoUri);
 
-  if (llmReady) {
-    orchestrator.startSchedule();
-
-    // Continuous backfill: catches all books stuck in incomplete states
-    // (metadata_complete, failed, published-no-chapters) every 20 minutes
-    const backfillAgent = new BackfillAgent();
-    app.set('backfillAgent', backfillAgent);
-    backfillAgent.startSchedule();
-  } else {
-    logger.warn('No LLM API key configured (OPENROUTER_API_KEY or OPENAI_API_KEY) — agent scheduling disabled');
+  if (typeof adminRouter.seedInitialAdmin === 'function') {
+    await adminRouter.seedInitialAdmin();
   }
 
-  const cron = require('node-cron');
-  const { runAllScrapers } = require('./services/scrapers');
-  const { autoImportBatch } = require('./services/autoImport');
+  await require('./startup/recoverState').recoverInterruptedWork();
 
-  // Daily scrape: all sources at 1:00 AM UTC (before agent runs)
-  cron.schedule('0 1 * * *', async () => {
-    logger.info('[Scraper] Scheduled daily scrape started');
-    try {
-      await runAllScrapers('scheduled');
-      logger.info('[Scraper] Scheduled daily scrape completed');
-    } catch (err) {
-      logger.error(`[Scraper] Scheduled scrape failed: ${err.message}`);
-    }
-  }, { timezone: 'UTC' });
-  logger.info('Scraper schedule: daily at 1:00 AM UTC');
-
-  // Auto-import: promote pending scraped books into the review queue every 30 min
-  cron.schedule('*/30 * * * *', async () => {
-    try {
-      const stats = await autoImportBatch(500);
-      if (stats.imported > 0) {
-        logger.info(`[AutoImport] ${stats.imported} books added to review queue`);
-      }
-    } catch (err) {
-      logger.error(`[AutoImport] Batch failed: ${err.message}`);
-    }
-  }, { timezone: 'UTC' });
-  logger.info('AutoImport schedule: every 30 minutes');
-
-  // Video generation: 1 video at 9 AM UTC and 1 at 9 PM UTC = 2/day
-  const VideoAgent = require('./agents/VideoAgent');
-  const videoAgent = new VideoAgent();
-  app.set('videoAgent', videoAgent);
-
-  const runScheduledVideo = async () => {
-    logger.info('[VideoAgent] Scheduled run starting');
-    try {
-      const results = await videoAgent.runBatch(1);
-      logger.info(`[VideoAgent] Scheduled run done: ${JSON.stringify(results)}`);
-    } catch (err) {
-      logger.error(`[VideoAgent] Scheduled run failed: ${err.message}`);
-    }
-  };
-
-  cron.schedule('0 3 * * *',  runScheduledVideo, { timezone: 'UTC' });
-  cron.schedule('0 9 * * *',  runScheduledVideo, { timezone: 'UTC' });
-  cron.schedule('0 15 * * *', runScheduledVideo, { timezone: 'UTC' });
-  cron.schedule('0 21 * * *', runScheduledVideo, { timezone: 'UTC' });
-  logger.info('VideoAgent schedule: daily at 3:00 AM, 9:00 AM, 3:00 PM and 9:00 PM UTC');
-
-  const natureSupervisor   = require('./services/natureStreamSupervisor');
-  const footballSupervisor = require('./services/footballStreamSupervisor');
-  const storageCleanup = require('./services/storageCleanup');
-
-  // Reset football stream if it was stuck mid-start on restart
-  const FootballStream = require('./models/FootballStream');
-  const stuckFootball = await FootballStream.updateMany(
-    { status: 'starting' },
-    { $set: { status: 'error', lastError: 'Server restarted mid-start', ffmpegPid: null } },
-  );
-  if (stuckFootball.modifiedCount > 0) {
-    logger.warn(`[startup] Reset ${stuckFootball.modifiedCount} stuck football stream(s)`);
-  }
-
-  natureSupervisor.startWatchdogCron();
-  footballSupervisor.startWatchdogCron();
-  storageCleanup.startStorageCleanupCron();
-
-  natureSupervisor.resumeLiveOnStartup().catch((err) => {
-    logger.error(`[NatureStream] Startup resume failed: ${err.message}`);
-  });
-  footballSupervisor.resumeLiveOnStartup().catch((err) => {
-    logger.error(`[FootballStream] Startup resume failed: ${err.message}`);
-  });
+  const app = createApp();
+  require('./startup/schedules').startSchedules(app);
 
   app.listen(config.port, () => {
     logger.info(`Reviewer Insight server running on http://localhost:${config.port}`);
@@ -292,7 +132,11 @@ async function startServer() {
   return app;
 }
 
-startServer().catch(err => {
-  logger.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  startServer().catch((err) => {
+    logger.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { createApp, startServer };

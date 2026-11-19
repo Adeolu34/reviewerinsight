@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { guarded } = require('../utils/jobGuard');
 const EditorAgent = require('./EditorAgent');
 const AuthorBioAgent = require('./AuthorBioAgent');
 const logger = require('../utils/logger');
@@ -37,7 +38,7 @@ class AgentOrchestrator {
     ];
 
     for (const { cron: cronExpr, editor, batchSize } of schedule) {
-      const job = cron.schedule(cronExpr, async () => {
+      const job = cron.schedule(cronExpr, guarded(`agent:${editor}`, async () => {
         if (llmCredits.isPaused()) {
           logger.warn(`Scheduled run skipped for ${editor} — ${llmCredits.pauseReason()}`);
           return;
@@ -48,21 +49,21 @@ class AgentOrchestrator {
         } catch (err) {
           logger.error(`Scheduled run failed for ${editor}: ${err.message}`);
         }
-      }, { timezone: 'UTC' });
+      }), { timezone: 'UTC' });
 
       this.scheduledJobs.push(job);
       logger.info(`Scheduled ${editor}: ${cronExpr} UTC (batch: ${batchSize})`);
     }
 
     // Sofia Kwon — author bios every 4 hours, batch 50 (clears backlog fast then idles)
-    const bioJob = cron.schedule('0 */4 * * *', async () => {
+    const bioJob = cron.schedule('0 */4 * * *', guarded('agent:author-bio', async () => {
       logger.info(`Scheduled author bio run triggered for ${this.authorBioAgent.name} (batch: 50)`);
       try {
         await this.authorBioAgent.run({ batchSize: 50 });
       } catch (err) {
         logger.error(`Scheduled author bio run failed: ${err.message}`);
       }
-    }, { timezone: 'UTC' });
+    }), { timezone: 'UTC' });
 
     this.scheduledJobs.push(bioJob);
     logger.info(`Scheduled ${this.authorBioAgent.name}: every 4h UTC (batch: 50)`);

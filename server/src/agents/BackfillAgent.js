@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { guarded } = require('../utils/jobGuard');
 const Book = require('../models/Book');
 const AgentRun = require('../models/AgentRun');
 const { generateReview, generateChapterSummary } = require('../services/openaiReview');
@@ -28,9 +29,7 @@ class BackfillAgent {
    * Also fires once 15s after server startup to catch immediate backlog.
    */
   startSchedule() {
-    this.job = cron.schedule('0 * * * *', async () => {
-      await this.run();
-    }, { timezone: 'UTC' });
+    this.job = cron.schedule('0 * * * *', guarded('backfill', () => this.run()), { timezone: 'UTC' });
 
     setTimeout(() => this.run(), 15000);
 

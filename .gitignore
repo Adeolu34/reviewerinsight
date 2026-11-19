@@ -8,3 +8,6 @@ nul
 server/server.log
 nature-live/
 server/nature-live/
+*.mp4
+server/.env.*
+!server/.env.example

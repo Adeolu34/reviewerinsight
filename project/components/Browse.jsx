@@ -157,7 +157,7 @@ const Browse = ({ setRoute, route, accent, density }) => {
               display:'grid', gridTemplateColumns:'60px 100px 1fr auto auto', gap: 24, alignItems:'center', padding:'20px 0', borderBottom:'1px solid rgba(20,18,16,0.15)', cursor:'pointer',
               animation: `ri-fadeUp .4s ${Math.min(i * .03, .4)}s cubic-bezier(.2,.8,.2,1) both`
             }} className="ri-row">
-              <div style={{ font:'600 11px "JetBrains Mono", monospace', opacity:.5 }}>No. {String(i+1).padStart(3,'0')}</div>
+              <div style={{ font:'600 11px "JetBrains Mono", monospace', opacity: .68 }}>No. {String(i+1).padStart(3,'0')}</div>
               <Cover book={b} size="xs"/>
               <div>
                 <div style={{ font:'700 24px "DM Serif Display", Georgia, serif', letterSpacing:'-.01em' }}>{b.title}</div>

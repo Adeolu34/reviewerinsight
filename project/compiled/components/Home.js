@@ -8,28 +8,34 @@ const Home = ({
   const pad = density === 'compact' ? 20 : 32;
 
   // API data with static fallbacks
-  const {
-    resolved: stats
-  } = useApi(() => ApiClient.getStats(), {
+  // One combined request batch -> ONE state update (and one page re-render) instead of three.
+  // Each call falls back independently, so a single failing endpoint never blanks the page.
+  const fallbackStats = {
     totalBooks: BOOKS.length,
     totalSummaries: BOOKS.length,
     totalIssues: 48,
     latestIssue: 'No. 048'
-  });
-  const {
-    resolved: featuredData
-  } = useApi(() => ApiClient.getFeatured(), {
+  };
+  const fallbackFeatured = {
     featured: BOOKS.find(b => b.id === 1),
     also: BOOKS.filter(b => b.featured && b.id !== 1).slice(0, 3)
-  });
-  const {
-    resolved: latestData
-  } = useApi(() => ApiClient.getBooks({
-    limit: 12
-  }), {
+  };
+  const fallbackLatest = {
     books: BOOKS.slice(0, 12),
     total: BOOKS.length
-  });
+  };
+  const {
+    resolved: homeData
+  } = useApi(() => Promise.all([ApiClient.getStats().catch(() => null), ApiClient.getFeatured().catch(() => null), ApiClient.getBooks({
+    limit: 12
+  }).catch(() => null)]).then(([s, f, l]) => ({
+    stats: s,
+    featured: f,
+    latest: l
+  })), {});
+  const stats = homeData.stats || fallbackStats;
+  const featuredData = homeData.featured || fallbackFeatured;
+  const latestData = homeData.latest || fallbackLatest;
   const {
     resolved: trendingData
   } = useApi(() => ApiClient.getTrending(), {
@@ -276,7 +282,7 @@ const Home = ({
       transform: calloutVis ? 'scale(1) translateY(0)' : 'scale(0.6) translateY(20px)',
       transition: `all .6s ${i * .15 + .1}s cubic-bezier(.2,.8,.2,1)`
     }
-  }, item.num), /*#__PURE__*/React.createElement("h3", {
+  }, item.num), /*#__PURE__*/React.createElement("h2", {
     style: {
       font: '700 26px "DM Serif Display", Georgia, serif',
       margin: '14px 0 8px'
@@ -940,7 +946,7 @@ const Home = ({
       font: '600 11px "JetBrains Mono", monospace',
       textTransform: 'uppercase',
       letterSpacing: '.14em',
-      opacity: .5
+      opacity: .68
     }
   }, "\u2715 Close"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1136,7 +1142,7 @@ const Footer = ({
       font: '600 11px "JetBrains Mono", monospace',
       textTransform: 'uppercase',
       letterSpacing: '.14em',
-      opacity: .5,
+      opacity: .68,
       position: 'relative'
     }
   }, /*#__PURE__*/React.createElement("span", null, "\xA9 2026 Reviewer Insight Editions Ltd."), /*#__PURE__*/React.createElement("span", null, "Issue No. 048 \xB7 Set in DM Serif Display, Space Grotesk, and JetBrains Mono.")));

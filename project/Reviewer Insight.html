@@ -19,10 +19,13 @@
 <meta name="twitter:description" content="In-depth book reviews, AI-powered summaries, and personalized reading recommendations."/>
 <!--SEO_INJECT-->
 <link rel="alternate" type="application/rss+xml" title="Reviewer Insight — Latest Book Reviews" href="https://reviewerinsight.com/feed.xml"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+<link rel="preload" href="fonts/DMSerifDisplay-normal-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href="fonts/SpaceGrotesk-normal-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href="fonts/JetBrainsMono-normal-latin.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="stylesheet" href="fonts/fonts.css"/>
 <style>
+.skip-link{position:absolute;left:-9999px;top:8px;z-index:10000;background:#141210;color:#fff;padding:10px 14px;font:600 14px sans-serif;text-decoration:none}
+.skip-link:focus{left:8px}
   html, body { margin: 0; padding: 0; background: #F5EFE4; color: #141210; font-family: "Space Grotesk", sans-serif; scroll-behavior: smooth; }
   *, *::before, *::after { box-sizing: border-box; }
   /* Pre-hydration book HTML: visible in #root until React mounts (avoid display:none on main text — bad indexing signal). */
@@ -148,7 +151,7 @@
   body::before {
     content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
     background-image: radial-gradient(rgba(20,18,16,0.05) 1px, transparent 1.2px);
-    background-size: 3px 3px; mix-blend-mode: multiply; opacity: .35;
+    background-size: 3px 3px; opacity: .35; contain: strict; will-change: auto;
   }
 
   /* ─── Marquee ─── */
@@ -156,7 +159,8 @@
     0% { transform: translateX(0); }
     100% { transform: translateX(-33.333%); }
   }
-  .ri-marquee { animation: ri-scroll 60s linear infinite; }
+  .ri-marquee { animation: ri-scroll 60s linear infinite; will-change: transform; }
+  @media (prefers-reduced-motion: reduce) { .ri-marquee, .ri-page-enter { animation: none !important; } }
   .ri-marquee:hover { animation-play-state: paused; }
 
   /* ─── Decorative section separator ─── */
@@ -203,32 +207,18 @@
   .tweaks-panel .seg button.on { background: #F5EFE4; color: #141210; }
 </style>
 
-<script defer src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
-<script defer src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script defer src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script defer src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
 <script defer src="data/books.js"></script>
 </head>
 <body>
 <div id="root"><!--SEO_CONTENT--></div>
 
-<script>
-  // Tweakable defaults — persisted via the host's edit-mode protocol.
-  window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-    "accent": "#E8432C",
-    "density": "cozy",
-    "heroVariant": "collage"
-  }/*EDITMODE-END*/;
-</script>
+<script defer src="tweaks.js"></script>
 
-<script defer src="compiled/components/ApiClient.js?v=nature-live-8"></script>
-<script defer src="compiled/components/Primitives.js"></script>
-<script defer src="compiled/components/Cover.js"></script>
-<script defer src="compiled/components/Home.js"></script>
-<script defer src="compiled/components/Browse.js"></script>
-<script defer src="compiled/components/Review.js"></script>
-<script defer src="compiled/components/Recommend.js"></script>
-<script defer src="compiled/components/OtherPages.js"></script>
-<script defer src="compiled/components/Admin.js?v=nature-live-8"></script>
-<script defer src="compiled/components/Authors.js"></script>
-<script defer src="compiled/app.js"></script>
+<!--BUNDLE:START-->
+<script defer src="compiled/admin-path.js?v=17a8f887a4"></script>
+<script defer src="compiled/site.2c70c5d68a.js"></script>
+<!--BUNDLE:END-->
 </body>
 </html>

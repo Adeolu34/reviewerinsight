@@ -1,4 +1,5 @@
 const express = require('express');
+const { clampInt } = require('../utils/pagination');
 const Book = require('../models/Book');
 const router = express.Router();
 
@@ -10,8 +11,8 @@ router.get('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const pageNum = clampInt(page, 1, 1, 100000);
+    const limitNum = clampInt(limit, 30, 1, 100);
 
     const filter = {
       status: 'published',

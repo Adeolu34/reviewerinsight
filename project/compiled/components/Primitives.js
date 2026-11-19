@@ -67,7 +67,7 @@ const Stars = ({
 };
 const Eyebrow = ({
   children,
-  color = "#E8432C",
+  color = "#C8341F",
   style
 }) => /*#__PURE__*/React.createElement("div", {
   style: {
@@ -93,7 +93,7 @@ const GenreTag = ({
   children,
   onClick,
   active,
-  accent = "#E8432C"
+  accent = "#C8341F"
 }) => /*#__PURE__*/React.createElement("button", {
   onClick: onClick,
   className: "ri-tag",
@@ -113,7 +113,7 @@ const GenreTag = ({
 }, children);
 const Seal = ({
   children,
-  color = "#E8432C",
+  color = "#C8341F",
   rotate = -8,
   size = 96
 }) => /*#__PURE__*/React.createElement("div", {
@@ -357,7 +357,7 @@ const Header = ({
       cursor: 'pointer',
       font: '600 14px "JetBrains Mono", monospace',
       color: ink,
-      opacity: .5,
+      opacity: .68,
       lineHeight: 1
     }
   }, "\xD7")), /*#__PURE__*/React.createElement("button", {

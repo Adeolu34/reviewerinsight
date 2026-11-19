@@ -77,6 +77,43 @@ function pathToRoute(pathname) {
     name: 'home'
   };
 }
+
+/** Loads the (large) admin bundle only when the admin route is opened. */
+function AdminLazy(props) {
+  const [ready, setReady] = React.useState(!!window.Admin);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    if (window.Admin) {
+      setReady(true);
+      return undefined;
+    }
+    const s = document.createElement('script');
+    s.src = window.__ADMIN_BUNDLE;
+    s.onload = () => setReady(true);
+    s.onerror = () => setFailed(true);
+    document.head.appendChild(s);
+    return () => {
+      s.onload = null;
+      s.onerror = null;
+    };
+  }, []);
+  if (failed) return /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: {
+      padding: 40,
+      fontFamily: 'sans-serif'
+    }
+  }, "Could not load the admin panel. Please refresh.");
+  if (!ready) return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    "aria-live": "polite",
+    style: {
+      padding: 40,
+      fontFamily: 'sans-serif'
+    }
+  }, "Loading admin\u2026");
+  return /*#__PURE__*/React.createElement(window.Admin, props);
+}
 function App() {
   const [route, setRouteState] = React.useState(() => {
     try {
@@ -144,7 +181,7 @@ function App() {
   };
   const routeKey = route.name + (route.id || '');
   if (route.name === 'admin') {
-    return /*#__PURE__*/React.createElement(window.Admin, {
+    return /*#__PURE__*/React.createElement(AdminLazy, {
       setRoute: setRoute,
       accent: tweaks.accent
     });
@@ -160,17 +197,25 @@ function App() {
     style: {
       '--accent': tweaks.accent
     }
-  }, /*#__PURE__*/React.createElement(window.Header, {
+  }, /*#__PURE__*/React.createElement("a", {
+    href: "#main",
+    className: "skip-link"
+  }, "Skip to main content"), /*#__PURE__*/React.createElement(window.Header, {
     route: route,
     setRoute: setRoute,
     accent: tweaks.accent
-  }), /*#__PURE__*/React.createElement("div", {
-    key: routeKey
+  }), /*#__PURE__*/React.createElement("main", {
+    id: "main",
+    tabIndex: -1,
+    key: routeKey,
+    style: {
+      outline: 'none'
+    }
   }, /*#__PURE__*/React.createElement(Page, ctx)), /*#__PURE__*/React.createElement("div", {
     className: "tweaks-panel" + (tweaksOpen ? ' visible' : '')
   }, /*#__PURE__*/React.createElement("h4", null, "Tweaks"), /*#__PURE__*/React.createElement("label", null, "Accent color"), /*#__PURE__*/React.createElement("div", {
     className: "swatches"
-  }, ['#E8432C', '#1E3A8A', '#E4A72B', '#0F5132', '#141210'].map(c => /*#__PURE__*/React.createElement("div", {
+  }, ['#C8341F', '#1E3A8A', '#E4A72B', '#0F5132', '#141210'].map(c => /*#__PURE__*/React.createElement("div", {
     key: c,
     className: "sw" + (tweaks.accent === c ? ' on' : ''),
     style: {

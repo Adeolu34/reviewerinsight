@@ -1,7 +1,7 @@
 // Authors catalog — listing page + individual author detail page
 
 // ─── Avatar: photo or styled initials ────────────────────────────────────────
-const AuthorAvatar = ({ name, photoUrl, size = 80, accent = '#E8432C' }) => {
+const AuthorAvatar = ({ name, photoUrl, size = 80, accent = '#C8341F' }) => {
   const [imgError, setImgError] = React.useState(false);
   const initials = (name || '').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const hash = (name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -266,7 +266,7 @@ const AuthorDetail = ({ slug, setRoute, accent, density }) => {
               ].map((s, i, arr) => (
                 <div key={s.label} style={{ padding: '14px 24px', borderRight: i < arr.length - 1 ? '1.5px solid #141210' : 'none', textAlign: 'center' }}>
                   <div style={{ font: '900 28px/1 "DM Serif Display", Georgia, serif', color: accent }}>{s.value}</div>
-                  <div style={{ font: '600 10px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em', opacity: .5, marginTop: 4 }}>{s.label}</div>
+                  <div style={{ font: '600 10px "JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '.14em', opacity: .68, marginTop: 4 }}>{s.label}</div>
                 </div>
               ))}
             </div>

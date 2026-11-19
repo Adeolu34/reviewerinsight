@@ -1866,6 +1866,7 @@ const YouTubeConnectionCard = () => {
   React.useEffect(() => {
     loadStatus();
     const handler = (e) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'youtube-connected') { setMsg(''); loadStatus(); }
       else if (typeof e.data === 'string' && e.data.startsWith('youtube-error:')) {
         setMsg('✗ ' + e.data.slice('youtube-error:'.length));
@@ -2116,7 +2117,7 @@ function naturePreviewFetchUrl(themeId) {
 
 /** Direct same-origin URL for <video src> (avoids blob: blocked by CSP). */
 function naturePreviewVideoSrc(themeId) {
-  const token = AdminClient.getToken();
+  const token = AdminClient.getMediaToken();
   const base = naturePreviewFetchUrl(themeId);
   return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
@@ -2188,6 +2189,7 @@ const NatureYoutubeConnectionCard = () => {
   React.useEffect(() => {
     loadStatus();
     const handler = (e) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'nature-youtube-connected') { setMsg(''); loadStatus(); }
       else if (typeof e.data === 'string' && e.data.startsWith('nature-youtube-error:')) {
         setMsg('✗ ' + e.data.slice('nature-youtube-error:'.length));
@@ -2488,6 +2490,7 @@ const FootballYoutubeConnectionCard = () => {
   React.useEffect(() => {
     loadStatus();
     const handler = (e) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'football-youtube-connected') { setMsg(''); loadStatus(); }
       else if (typeof e.data === 'string' && e.data.startsWith('football-youtube-error:')) {
         setMsg('✗ ' + e.data.slice('football-youtube-error:'.length));

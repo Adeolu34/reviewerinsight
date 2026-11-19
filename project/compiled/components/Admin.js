@@ -4009,6 +4009,7 @@ const YouTubeConnectionCard = () => {
   React.useEffect(() => {
     loadStatus();
     const handler = e => {
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'youtube-connected') {
         setMsg('');
         loadStatus();
@@ -4515,7 +4516,7 @@ function naturePreviewFetchUrl(themeId) {
 
 /** Direct same-origin URL for <video src> (avoids blob: blocked by CSP). */
 function naturePreviewVideoSrc(themeId) {
-  const token = AdminClient.getToken();
+  const token = AdminClient.getMediaToken();
   const base = naturePreviewFetchUrl(themeId);
   return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
@@ -4642,6 +4643,7 @@ const NatureYoutubeConnectionCard = () => {
   React.useEffect(() => {
     loadStatus();
     const handler = e => {
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'nature-youtube-connected') {
         setMsg('');
         loadStatus();
@@ -5163,6 +5165,7 @@ const FootballYoutubeConnectionCard = () => {
   React.useEffect(() => {
     loadStatus();
     const handler = e => {
+      if (e.origin !== window.location.origin) return;
       if (e.data === 'football-youtube-connected') {
         setMsg('');
         loadStatus();
